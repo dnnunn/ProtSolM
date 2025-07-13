@@ -9,9 +9,12 @@ Usage:
 Outputs CSV with columns:
   Accession, Sequence, Predictor, SolubilityScore, Probability_Soluble, Probability_Insoluble
 """
-import argparse
 import os
+import sys
+import argparse
 import subprocess
+import shutil
+import tempfile
 import pandas as pd
 from Bio import SeqIO
 
