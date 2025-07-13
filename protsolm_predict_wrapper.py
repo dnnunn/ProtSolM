@@ -29,7 +29,6 @@ def run_protsolm(input_csv, output_dir):
     # Get the ProtSolM root directory
     protsolm_dir = os.path.dirname(os.path.abspath(__file__))
     script_name = 'eval.py'
-    script_path = os.path.join(protsolm_dir, script_name)
     
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -45,13 +44,24 @@ def run_protsolm(input_csv, output_dir):
         # Change to ProtSolM directory before running eval.py
         os.chdir(protsolm_dir)
         
-        # Run the command
+        # According to README, we need to use PDBSol or ExternalTest dataset
+        # Let's use the ExternalTest dataset as it's likely more suitable for external predictions
+        dataset_dir = os.path.join(protsolm_dir, 'data', 'ExternalTest')
+        feature_file = os.path.join(dataset_dir, 'ExternalTest_feature.csv')
+        
+        # Run the command with all required parameters per README
         cmd = [
-            'python', script_name,  # Use just the script name as we're now in the correct directory
+            'python', script_name,
+            '--supv_dataset', dataset_dir,
             '--test_file', abs_input_csv,
-            '--test_result_dir', abs_output_dir
+            '--test_result_dir', abs_output_dir,
+            '--feature_file', feature_file,
+            '--feature_name', 'aa_composition', 'gravy', 'ss_composition', 'hygrogen_bonds', 'exposed_res_fraction', 'pLDDT',
+            '--use_plddt_penalty',
+            '--batch_token_num', '3000'
         ]
-        print(f"Running from {os.getcwd()}: {' '.join(cmd)}")
+        
+        print(f"Running ProtSolM from {os.getcwd()}: {' '.join(cmd)}")
         subprocess.run(cmd, check=True)
     finally:
         # Restore original directory
