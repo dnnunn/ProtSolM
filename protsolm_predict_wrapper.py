@@ -44,15 +44,40 @@ def run_protsolm(input_csv, output_dir):
         # Change to ProtSolM directory before running eval.py
         os.chdir(protsolm_dir)
         
-        # According to README, we need to use PDBSol or ExternalTest dataset
-        # Let's use the ExternalTest dataset as it's likely more suitable for external predictions
-        dataset_dir = os.path.join(protsolm_dir, 'data', 'ExternalTest')
-        feature_file = os.path.join(dataset_dir, 'ExternalTest_feature.csv')
+        # Find a valid dataset directory with pdb or esmfold_pdb subdirectory
+        dataset_paths = [
+            os.path.join(protsolm_dir, 'data', 'PDBSol'),
+            os.path.join(protsolm_dir, 'data', 'ExternalTest')
+        ]
+        
+        valid_dataset = None
+        for path in dataset_paths:
+            if os.path.exists(os.path.join(path, 'pdb')) or os.path.exists(os.path.join(path, 'esmfold_pdb')):
+                valid_dataset = path
+                dataset_name = os.path.basename(path)
+                break
+        
+        if valid_dataset is None:
+            raise ValueError("No valid dataset directory found with pdb or esmfold_pdb subdirectory. " 
+                           "Please make sure one exists in the PDBSol or ExternalTest directories.")
+        
+        print(f"Using dataset: {valid_dataset}")
+        feature_file = os.path.join(valid_dataset, f"{dataset_name}_feature.csv")
+        
+        if not os.path.exists(feature_file):
+            # If feature file doesn't exist, look for any feature file
+            print(f"Feature file {feature_file} not found, looking for any feature file")
+            feature_files = [f for f in os.listdir(valid_dataset) if f.endswith('_feature.csv')]
+            if feature_files:
+                feature_file = os.path.join(valid_dataset, feature_files[0])
+                print(f"Found feature file: {feature_file}")
+            else:
+                raise ValueError(f"No feature file found in {valid_dataset}")
         
         # Run the command with all required parameters per README
         cmd = [
             'python', script_name,
-            '--supv_dataset', dataset_dir,
+            '--supv_dataset', valid_dataset,
             '--test_file', abs_input_csv,
             '--test_result_dir', abs_output_dir,
             '--feature_file', feature_file,
