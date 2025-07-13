@@ -325,11 +325,11 @@ if __name__ == "__main__":
     # Load checkpoint and extract state_dict if it's in a dictionary format
     checkpoint = torch.load(args.gnn_model_path)
     if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-        logger.info(f"Loading model state_dict from checkpoint dictionary")
-        gnn_model.load_state_dict(checkpoint['state_dict'])
+        logger.info(f"Loading model state_dict from checkpoint dictionary with strict=False")
+        gnn_model.load_state_dict(checkpoint['state_dict'], strict=False)
     else:
-        logger.info(f"Loading model state_dict directly from checkpoint")
-        gnn_model.load_state_dict(checkpoint)
+        logger.info(f"Loading model state_dict directly from checkpoint with strict=False")
+        gnn_model.load_state_dict(checkpoint, strict=False)
     protssn_classification = ProtssnClassification(args)
     protssn_classification.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
