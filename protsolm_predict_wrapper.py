@@ -25,7 +25,58 @@ def fasta_to_csv(fasta_path, csv_path):
     df.to_csv(csv_path, index=False)
     return df
 
-def run_protsolm(input_csv, output_dir):
+def setup_custom_dataset(input_csv, structures_dir=None):
+    """Set up a custom dataset directory with PDB files for ProtSolM to use"""
+    # Get the ProtSolM root directory
+    protsolm_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Define custom dataset location
+    custom_dataset_dir = os.path.join(protsolm_dir, 'custom_dataset')
+    pdb_dir = os.path.join(custom_dataset_dir, 'pdb')
+    
+    # Create directories if they don't exist
+    os.makedirs(custom_dataset_dir, exist_ok=True)
+    os.makedirs(pdb_dir, exist_ok=True)
+    
+    print(f"Set up custom dataset directory at: {custom_dataset_dir}")
+    
+    # Copy the input CSV as test.csv in the custom dataset directory
+    shutil.copy(input_csv, os.path.join(custom_dataset_dir, 'test.csv'))
+    
+    # If structures_dir is provided, symlink PDB files to the custom dataset's pdb directory
+    if structures_dir and os.path.exists(structures_dir):
+        print(f"Linking PDB files from {structures_dir} to {pdb_dir}")
+        try:
+            # Get list of PDB files in structures_dir
+            pdb_files = [f for f in os.listdir(structures_dir) if f.endswith('.pdb')]
+            print(f"Found {len(pdb_files)} PDB files in {structures_dir}")
+            
+            # Link each PDB file to the custom pdb directory
+            for pdb_file in pdb_files:
+                src = os.path.join(structures_dir, pdb_file)
+                dst = os.path.join(pdb_dir, pdb_file)
+                if not os.path.exists(dst):
+                    os.symlink(src, dst)
+            print(f"Linked {len(pdb_files)} PDB files to custom dataset directory")
+        except Exception as e:
+            print(f"Error linking PDB files: {e}")
+    
+    # If a feature file exists in one of the built-in datasets, copy it to the custom dataset
+    # This is a workaround until we generate features for our custom PDB files
+    for dataset_name in ['PDBSol', 'ExternalTest']:
+        src_path = os.path.join(protsolm_dir, 'data', dataset_name)
+        if os.path.exists(src_path):
+            feature_files = [f for f in os.listdir(src_path) if f.endswith('_feature.csv')]
+            if feature_files:
+                src_feature = os.path.join(src_path, feature_files[0])
+                dst_feature = os.path.join(custom_dataset_dir, 'custom_feature.csv')
+                shutil.copy(src_feature, dst_feature)
+                print(f"Copied feature file from {src_feature} to {dst_feature}")
+                break
+    
+    return custom_dataset_dir
+
+def run_protsolm(input_csv, output_dir, structures_dir=None):
     # Get the ProtSolM root directory
     protsolm_dir = os.path.dirname(os.path.abspath(__file__))
     script_name = 'eval.py'
@@ -44,40 +95,26 @@ def run_protsolm(input_csv, output_dir):
         # Change to ProtSolM directory before running eval.py
         os.chdir(protsolm_dir)
         
-        # Find a valid dataset directory with pdb or esmfold_pdb subdirectory
-        dataset_paths = [
-            os.path.join(protsolm_dir, 'data', 'PDBSol'),
-            os.path.join(protsolm_dir, 'data', 'ExternalTest')
-        ]
+        # Setup custom dataset with PDB files
+        if structures_dir:
+            structures_abs_path = os.path.abspath(structures_dir)
+        else:
+            # Try to find structures in standard location relative to input CSV
+            input_dir = os.path.dirname(abs_input_csv)
+            structures_abs_path = os.path.join(input_dir, 'test_results', 'structures')
+            if not os.path.exists(structures_abs_path):
+                structures_abs_path = None
+                print("No structures directory found, will use existing dataset")
+            
+        custom_dataset_dir = setup_custom_dataset(abs_input_csv, structures_abs_path)
         
-        valid_dataset = None
-        for path in dataset_paths:
-            if os.path.exists(os.path.join(path, 'pdb')) or os.path.exists(os.path.join(path, 'esmfold_pdb')):
-                valid_dataset = path
-                dataset_name = os.path.basename(path)
-                break
-        
-        if valid_dataset is None:
-            raise ValueError("No valid dataset directory found with pdb or esmfold_pdb subdirectory. " 
-                           "Please make sure one exists in the PDBSol or ExternalTest directories.")
-        
-        print(f"Using dataset: {valid_dataset}")
-        feature_file = os.path.join(valid_dataset, f"{dataset_name}_feature.csv")
-        
-        if not os.path.exists(feature_file):
-            # If feature file doesn't exist, look for any feature file
-            print(f"Feature file {feature_file} not found, looking for any feature file")
-            feature_files = [f for f in os.listdir(valid_dataset) if f.endswith('_feature.csv')]
-            if feature_files:
-                feature_file = os.path.join(valid_dataset, feature_files[0])
-                print(f"Found feature file: {feature_file}")
-            else:
-                raise ValueError(f"No feature file found in {valid_dataset}")
+        # Use the custom dataset feature file
+        feature_file = os.path.join(custom_dataset_dir, 'custom_feature.csv')
         
         # Run the command with all required parameters per README
         cmd = [
             'python', script_name,
-            '--supv_dataset', valid_dataset,
+            '--supv_dataset', custom_dataset_dir,
             '--test_file', abs_input_csv,
             '--test_result_dir', abs_output_dir,
             '--feature_file', feature_file,
@@ -95,33 +132,53 @@ def run_protsolm(input_csv, output_dir):
     return os.path.join(abs_output_dir, 'test_result.csv')
 
 def main():
-    parser = argparse.ArgumentParser(description="Batch ProtSolM predictor wrapper")
-    parser.add_argument('--fasta', '-f', required=True, help='Input FASTA file')
-    parser.add_argument('--out', '-o', required=True, help='Output CSV file')
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='ProtSolM solubility prediction wrapper')
+    parser.add_argument('--fasta', type=str, required=True, help='Input FASTA file path')
+    parser.add_argument('--out', type=str, required=True, help='Output CSV file path')
+    parser.add_argument('--structures', type=str, help='Directory containing PDB structure files')
     args = parser.parse_args()
-
-    tmp_input_csv = 'tmp_protsolm_input.csv'
-    tmp_output_dir = 'tmp_protsolm_results'
-
-    input_df = fasta_to_csv(args.fasta, tmp_input_csv)
-    result_csv = run_protsolm(tmp_input_csv, tmp_output_dir)
-
-    df = pd.read_csv(result_csv)
-    df['Predictor'] = 'ProtSolM'
-    # If probability is not available, set SolubilityScore as 1 for soluble, 0 for insoluble
-    if 'predicted_probability' in df.columns:
-        df['SolubilityScore'] = df['predicted_probability'].astype(float)
-        df['Probability_Soluble'] = df['SolubilityScore']
-        df['Probability_Insoluble'] = 1 - df['SolubilityScore']
-    else:
-        df['SolubilityScore'] = df['pred_label'].map(lambda x: 1 if x == 1 or str(x).lower() == 'soluble' else 0)
-        df['Probability_Soluble'] = df['SolubilityScore']
-        df['Probability_Insoluble'] = 1 - df['SolubilityScore']
-    df.rename(columns={'name': 'Accession', 'aa_seq': 'Sequence'}, inplace=True)
-    df = df[['Accession', 'Sequence', 'Predictor', 'SolubilityScore', 'Probability_Soluble', 'Probability_Insoluble']]
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    df.to_csv(args.out, index=False)
-    print(f"Results written to {args.out}")
+    
+    # Ensure both input and output paths exist or can be created
+    if not os.path.exists(args.fasta):
+        print(f"Error: Input FASTA file not found: {args.fasta}")
+        return 1
+        
+    output_dir = os.path.dirname(args.out)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Check if structures directory exists if provided
+    structures_dir = None
+    if args.structures:
+        if not os.path.exists(args.structures):
+            print(f"Warning: Structures directory not found: {args.structures}")
+        else:
+            structures_dir = args.structures
+            print(f"Using structures from: {structures_dir}")
+    
+    # Convert FASTA to CSV if needed
+    print(f"Processing FASTA: {args.fasta}")
+    temp_dir = tempfile.mkdtemp()
+    input_csv = os.path.join(temp_dir, 'input.csv')
+    fasta_to_csv(args.fasta, input_csv)
+    
+    try:
+        # Run ProtSolM prediction
+        result_csv = run_protsolm(input_csv, temp_dir, structures_dir)
+        
+        # Copy result to output path
+        if os.path.exists(result_csv):
+            shutil.copyfile(result_csv, args.out)
+            print(f"Prediction results saved to: {args.out}")
+        else:
+            print(f"Error: ProtSolM did not generate results at {result_csv}")
+            return 1
+    finally:
+        # Clean up temporary files
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    
+    return 0
 
 if __name__ == '__main__':
     main()
