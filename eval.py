@@ -321,7 +321,15 @@ if __name__ == "__main__":
     plm_model = PLM_model(args).to(device)
     global gnn_model
     gnn_model = GNN_model(args).to(device)
-    gnn_model.load_state_dict(torch.load(args.gnn_model_path))
+    
+    # Load checkpoint and extract state_dict if it's in a dictionary format
+    checkpoint = torch.load(args.gnn_model_path)
+    if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+        logger.info(f"Loading model state_dict from checkpoint dictionary")
+        gnn_model.load_state_dict(checkpoint['state_dict'])
+    else:
+        logger.info(f"Loading model state_dict directly from checkpoint")
+        gnn_model.load_state_dict(checkpoint)
     protssn_classification = ProtssnClassification(args)
     protssn_classification.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
