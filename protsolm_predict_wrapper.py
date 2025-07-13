@@ -125,6 +125,12 @@ def run_protsolm(input_csv, output_dir, structures_dir=None):
         # Use the custom dataset feature file
         feature_file = os.path.join(custom_dataset_dir, 'custom_feature.csv')
         
+        # Find the model file in the ckpt directory
+        model_path = os.path.join(protsolm_dir, 'ckpt', 'feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt')
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found at {model_path}")
+        print(f"Using model file: {model_path}")
+        
         # Run the command with all required parameters per README
         cmd = [
             'python', script_name,
@@ -132,6 +138,7 @@ def run_protsolm(input_csv, output_dir, structures_dir=None):
             '--test_file', abs_input_csv,
             '--test_result_dir', abs_output_dir,
             '--feature_file', feature_file,
+            '--gnn_model_path', model_path,
             '--feature_name', 'aa_composition', 'gravy', 'ss_composition', 'hygrogen_bonds', 'exposed_res_fraction', 'pLDDT',
             '--use_plddt_penalty',
             '--batch_token_num', '3000'
