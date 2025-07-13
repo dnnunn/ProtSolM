@@ -19,12 +19,23 @@ import pandas as pd
 from Bio import SeqIO
 
 def fasta_to_csv(fasta_path, csv_path):
-    # ProtSolM expects: name,aa_seq
+    """Convert a FASTA file to a CSV file with columns name, aa_seq, and label"""
     records = list(SeqIO.parse(fasta_path, "fasta"))
-    df = pd.DataFrame({
-        'name': [rec.id for rec in records],
-        'aa_seq': [str(rec.seq) for rec in records]
-    })
+    
+    # Create dataframe
+    data = []
+    for record in records:
+        data.append({
+            "name": record.id,
+            "aa_seq": str(record.seq),
+            # Add a default label column (1 = soluble, 0 = insoluble)
+            # Since we're making predictions, we'll use a dummy value
+            # that will be replaced by the actual prediction
+            "label": 1  # Default to soluble as a placeholder
+        })
+    
+    # Save to CSV
+    df = pd.DataFrame(data)
     df.to_csv(csv_path, index=False)
     return df
 
