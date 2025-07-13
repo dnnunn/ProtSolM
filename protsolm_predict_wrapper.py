@@ -26,15 +26,38 @@ def fasta_to_csv(fasta_path, csv_path):
     return df
 
 def run_protsolm(input_csv, output_dir):
-    script_path = os.path.join(os.path.dirname(__file__), 'eval.py')
+    # Get the ProtSolM root directory
+    protsolm_dir = os.path.dirname(os.path.abspath(__file__))
+    script_name = 'eval.py'
+    script_path = os.path.join(protsolm_dir, script_name)
+    
+    # Create output directory
     os.makedirs(output_dir, exist_ok=True)
-    cmd = [
-        'python', script_path,
-        '--test_file', input_csv,
-        '--test_result_dir', output_dir
-    ]
-    subprocess.run(cmd, check=True)
-    return os.path.join(output_dir, 'test_result.csv')
+    
+    # Use absolute paths for input and output
+    abs_input_csv = os.path.abspath(input_csv)
+    abs_output_dir = os.path.abspath(output_dir)
+    
+    # Save current directory
+    cwd = os.getcwd()
+    
+    try:
+        # Change to ProtSolM directory before running eval.py
+        os.chdir(protsolm_dir)
+        
+        # Run the command
+        cmd = [
+            'python', script_name,  # Use just the script name as we're now in the correct directory
+            '--test_file', abs_input_csv,
+            '--test_result_dir', abs_output_dir
+        ]
+        print(f"Running from {os.getcwd()}: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
+    finally:
+        # Restore original directory
+        os.chdir(cwd)
+    
+    return os.path.join(abs_output_dir, 'test_result.csv')
 
 def main():
     parser = argparse.ArgumentParser(description="Batch ProtSolM predictor wrapper")
