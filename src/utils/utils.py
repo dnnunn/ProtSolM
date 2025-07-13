@@ -10,7 +10,18 @@ import numpy as np
 import pandas as pd
 from biotite.structure.io import pdbx, pdb
 from biotite.structure.residues import get_residues
-from biotite.structure import filter_backbone
+# from biotite.structure import filter_backbone # Commented out due to missing in installed version
+
+# Added filter_backbone function implementation
+def filter_backbone(atom_array):
+    '''Filter for backbone atoms (N, CA, C, O) in a protein structure.'''
+    mask = []
+    for atom in atom_array:
+        if atom.atom_name in ["N", "CA", "C", "O"]:
+            mask.append(True)
+        else:
+            mask.append(False)
+    return mask
 from biotite.structure import get_chains
 from biotite.sequence import ProteinSequence
 from typing import *
