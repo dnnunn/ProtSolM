@@ -88,7 +88,6 @@ def generate_feature(pdb_file):
         return pdb_file, e
     finally:
         if 'is_temp' in locals() and is_temp:
-            import os
             os.unlink(pdb_for_dssp)
 
     sec_structure_str_8 = ''.join(sec_structures)
