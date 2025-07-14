@@ -762,18 +762,37 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Enhanced ProtSolM prediction with robust DSSP integration")
-    parser.add_argument("--input_csv", required=True, help="Path to input CSV with sequences")
+    parser.add_argument("--fasta", required=True, help="Path to input FASTA file with sequences")
     parser.add_argument("--structures_dir", help="Path to directory with PDB files")
-    parser.add_argument("--output_path", help="Path to write output predictions")
+    parser.add_argument("--out", help="Path to write output predictions")
     
     args = parser.parse_args()
     
+    # Convert FASTA to CSV
+    print(f"Processing FASTA: {args.fasta}")
+    temp_dir = tempfile.mkdtemp()
+    input_csv = os.path.join(temp_dir, 'input.csv')
+    fasta_to_csv(args.fasta, input_csv)
+    
+    # Run the prediction
     result_path = run_protsolm(
-        args.input_csv,
+        input_csv,
         structures_dir=args.structures_dir,
-        output_path=args.output_path
+        output_path=args.out
     )
+    
+    # Clean up temp directory
+    shutil.rmtree(temp_dir, ignore_errors=True)
     
     print(f"\nPrediction completed successfully!")
     print(f"Results saved to: {result_path}")
+    
+    # Display the first few lines of the results
+    try:
+        results_df = pd.read_csv(result_path)
+        print("\nPreview of results:")
+        print(results_df.head())
+    except Exception as e:
+        print(f"Could not display results preview: {e}")
+
 
