@@ -90,8 +90,8 @@ def create_fallback_feature_file(feature_file_path, input_csv_path):
     # Required pLDDT features
     plddt_features = ['avg_plddt', 'min_plddt']
     
-    # Required gravy features
-    gravy_features = ['gravy']
+    # Required gravy features - NOTE: This must be uppercase 'GRAVY'
+    gravy_features = ['GRAVY']
     
     # Additional features that might be expected
     additional_features = [
