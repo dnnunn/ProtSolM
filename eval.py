@@ -290,7 +290,14 @@ if __name__ == "__main__":
                     fe = value
      
         if fe is None:
-            print(f'\'{name}\'')
+            logger.info(f"No features found for '{name}', using default zeros")
+            # Create default feature vector with the same dimension as other features
+            if args.feature_dim > 0:
+                fe = [0.0] * args.feature_dim
+            else:
+                # If we don't know the dimension, use a reasonable default
+                fe = [0.0] * 100
+                
         data.feature = torch.tensor(fe).view(1, -1)
         return data
     
