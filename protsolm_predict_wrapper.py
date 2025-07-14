@@ -43,8 +43,52 @@ def fasta_to_csv(fasta_path, csv_path):
     df.to_csv(csv_path, index=False)
     return df
 
-def create_fallback_feature_file(feature_file_path, input_csv_path):
-    """Create a fallback feature file with default values if feature generation failed"""
+def validate_feature_file(file_path):
+    """Validate that the feature file exists and is a valid CSV with data.
+    
+    Args:
+        file_path: Path to the feature file to validate
+        
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    if not os.path.exists(file_path):
+        logging.error(f"Feature file not found: {file_path}")
+        return False
+    
+    try:
+        # Try to read the file
+        df = pd.read_csv(file_path)
+        
+        # Check if it has any data
+        if df.empty:
+            logging.error(f"Feature file is empty: {file_path}")
+            return False
+            
+        # Check if it has a 'protein name' column which is required
+        if 'protein name' not in df.columns:
+            logging.error(f"Feature file missing 'protein name' column: {file_path}")
+            return False
+            
+        # Check if it has at least some feature columns
+        if len(df.columns) < 5:  # Protein name + a few features at minimum
+            logging.error(f"Feature file has too few columns: {file_path}")
+            return False
+            
+        logging.info(f"Feature file validated successfully: {file_path}")
+        return True
+    except Exception as e:
+        logging.error(f"Error validating feature file: {e}")
+        return False
+
+
+def create_fallback_feature_file(input_csv_path, feature_file_path):
+    """Create a fallback feature file with default values (zeros).
+    
+    Args:
+        input_csv_path: Path to the input CSV file with protein sequences
+        feature_file_path: Path to the output feature CSV file to create
+    """
     import pandas as pd
     
     logging.warning(f"Creating FALLBACK feature file with ZERO VALUES: {feature_file_path}")
@@ -52,8 +96,16 @@ def create_fallback_feature_file(feature_file_path, input_csv_path):
     
     print(f"Creating fallback feature file at {feature_file_path}")
     
-    # Read the input CSV to get protein names
-    input_df = pd.read_csv(input_csv_path)
+    try:
+        # Read the input CSV to get protein names
+        input_df = pd.read_csv(input_csv_path)
+    except Exception as e:
+        logging.error(f"Error reading input CSV: {e}")
+        logging.warning(f"Will attempt to create minimal fallback feature file with default protein names")
+        # Create a minimal dataframe with default protein names
+        input_df = pd.DataFrame({
+            'name': [f'protein_{i+1}' for i in range(100)],  # Generate 100 default protein names
+        })
     
     # Try different column names for protein identifiers
     id_column = None
