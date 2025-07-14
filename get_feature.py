@@ -26,7 +26,34 @@ def generate_feature(pdb_file):
         pdb_parser = PDB.PDBParser(QUIET=True)
         structure = pdb_parser.get_structure("protein", pdb_file)
         model = structure[0]
-        dssp = PDB.DSSP(model, pdb_file)
+        try:
+            # Try Bio.PDB.DSSP with explicit mkdssp path (should use correct mkdssp invocation)
+            dssp = PDB.DSSP(model, pdb_file, dssp='mkdssp')
+        except Exception as dssp_exc:
+            # Fallback: run mkdssp via subprocess with correct arguments, then parse output
+            import tempfile
+            import subprocess
+            from Bio.PDB import make_dssp_dict
+            tmp_dssp = tempfile.NamedTemporaryFile(delete=False)
+            tmp_dssp.close()
+            try:
+                # mkdssp input.pdb output.dssp (no -i/-o flags)
+                result = subprocess.run([
+                    'mkdssp', pdb_file, tmp_dssp.name
+                ], capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise RuntimeError(f"mkdssp failed: {result.stderr}")
+                dssp_dict, _ = make_dssp_dict(tmp_dssp.name)
+                # Convert dssp_dict to DSSP-like list for compatibility
+                dssp = [
+                    (None, None, d['SS'], d['ASA'])
+                    for k, d in dssp_dict.items()
+                ]
+            except Exception as sub_exc:
+                return pdb_file, f"Bio.PDB.DSSP failed: {dssp_exc}; mkdssp fallback failed: {sub_exc}"
+            finally:
+                os.unlink(tmp_dssp.name)
+
         traj = md.load(pdb_file)
         hbonds = md.kabsch_sander(traj)
 
