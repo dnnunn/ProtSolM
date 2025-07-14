@@ -46,18 +46,16 @@ def setup_custom_dataset(input_csv, structures_dir=None):
     
     # Define custom dataset location
     custom_dataset_dir = os.path.join(protsolm_dir, 'custom_dataset')
-    pdb_dir = os.path.join(custom_dataset_dir, 'pdb')
-    
-    # Create directories if they don't exist
     os.makedirs(custom_dataset_dir, exist_ok=True)
-    os.makedirs(pdb_dir, exist_ok=True)
     
-    print(f"Set up custom dataset directory at: {custom_dataset_dir}")
+    # Create PDB directory
+    pdb_dir = os.path.join(custom_dataset_dir, 'pdb')
+    os.makedirs(pdb_dir, exist_ok=True)
     
     # Copy the input CSV as test.csv in the custom dataset directory
     shutil.copy(input_csv, os.path.join(custom_dataset_dir, 'test.csv'))
     
-    # If structures_dir is provided, symlink PDB files to the custom dataset's pdb directory
+    # Link PDB files from structures_dir to custom_dataset_dir/pdb if provided
     if structures_dir and os.path.exists(structures_dir):
         print(f"Linking PDB files from {structures_dir} to {pdb_dir}")
         try:
@@ -72,21 +70,42 @@ def setup_custom_dataset(input_csv, structures_dir=None):
                 if not os.path.exists(dst):
                     os.symlink(src, dst)
             print(f"Linked {len(pdb_files)} PDB files to custom dataset directory")
+            
+            # Generate features for the custom PDB files
+            feature_dst = os.path.join(custom_dataset_dir, 'custom_feature.csv')
+            print(f"Generating features for {len(pdb_files)} PDB files...")
+            
+            # Run feature generation
+            cmd = [
+                'python', os.path.join(protsolm_dir, 'get_feature.py'),
+                '--pdb_dir', pdb_dir,
+                '--out_file', feature_dst,
+                '--num_workers', '4'  # Using fewer workers to avoid memory issues
+            ]
+            
+            try:
+                subprocess.run(cmd, check=True, cwd=protsolm_dir)
+                print(f"Features successfully generated and saved to {feature_dst}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error generating features: {e}")
+                # If feature generation fails, use the default feature file as fallback
+                feature_src = os.path.join(protsolm_dir, 'data', 'PDBSol', 'PDBSol_feature.csv')
+                shutil.copy(feature_src, feature_dst)
+                print(f"Falling back to copied feature file from {feature_src} to {feature_dst}")
         except Exception as e:
-            print(f"Error linking PDB files: {e}")
-    
-    # If a feature file exists in one of the built-in datasets, copy it to the custom dataset
-    # This is a workaround until we generate features for our custom PDB files
-    for dataset_name in ['PDBSol', 'ExternalTest']:
-        src_path = os.path.join(protsolm_dir, 'data', dataset_name)
-        if os.path.exists(src_path):
-            feature_files = [f for f in os.listdir(src_path) if f.endswith('_feature.csv')]
-            if feature_files:
-                src_feature = os.path.join(src_path, feature_files[0])
-                dst_feature = os.path.join(custom_dataset_dir, 'custom_feature.csv')
-                shutil.copy(src_feature, dst_feature)
-                print(f"Copied feature file from {src_feature} to {dst_feature}")
-                break
+            print(f"Error processing PDB files: {e}")
+    else:
+        # If no structures provided, use a default feature file as fallback
+        for dataset_name in ['PDBSol', 'ExternalTest']:
+            src_path = os.path.join(protsolm_dir, 'data', dataset_name)
+            if os.path.exists(src_path):
+                feature_files = [f for f in os.listdir(src_path) if f.endswith('_feature.csv')]
+                if feature_files:
+                    src_feature = os.path.join(src_path, feature_files[0])
+                    dst_feature = os.path.join(custom_dataset_dir, 'custom_feature.csv')
+                    shutil.copy(src_feature, dst_feature)
+                    print(f"Copied feature file from {src_feature} to {dst_feature}")
+                    break
     
     return custom_dataset_dir
 

@@ -192,7 +192,7 @@ if __name__ == '__main__':
         futures = [executor.submit(process_pdb, pdb) for pdb in pdb_files]
         for future in tqdm(as_completed(futures), total=len(pdb_files)):
             properties = future.result()
-            if property is not None:
+            if properties is not None:
                 for k, v in properties.items():
                     if k not in property_dict:
                         property_dict[k] = []
