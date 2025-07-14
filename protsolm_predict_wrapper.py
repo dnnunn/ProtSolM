@@ -175,10 +175,25 @@ def run_protsolm(input_csv, output_dir, structures_dir=None):
         # Use the custom dataset feature file
         feature_file = os.path.join(custom_dataset_dir, 'custom_feature.csv')
         
-        # Check if feature file exists and is not empty
-        feature_file_valid = os.path.exists(feature_file) and os.path.getsize(feature_file) > 0
+        # Check if feature file exists, is not empty, and is valid
+        feature_file_valid = False
+        if os.path.exists(feature_file) and os.path.getsize(feature_file) > 0:
+            # Try to read the file with pandas to ensure it's a valid CSV
+            try:
+                import pandas as pd
+                test_df = pd.read_csv(feature_file)
+                if len(test_df) > 0 and 'protein name' in test_df.columns:
+                    feature_file_valid = True
+                else:
+                    print(f"Warning: Feature file {feature_file} exists but has no data or missing columns.")
+            except Exception as e:
+                print(f"Warning: Feature file {feature_file} exists but is not a valid CSV: {e}")
+        else:
+            print(f"Warning: Feature file {feature_file} is missing or empty.")
+            
+        # Create fallback feature file if needed
         if not feature_file_valid:
-            print(f"Warning: Feature file {feature_file} is missing or empty. Using fallback feature generation.")
+            print("Using fallback feature generation.")
             # Create a fallback feature file with zeros if feature generation failed
             create_fallback_feature_file(feature_file, abs_input_csv)
             
