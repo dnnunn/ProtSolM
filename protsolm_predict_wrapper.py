@@ -47,7 +47,21 @@ def create_fallback_feature_file(feature_file_path, input_csv_path):
     
     # Read the input CSV to get protein names
     input_df = pd.read_csv(input_csv_path)
-    protein_names = input_df['seq_id'].tolist()
+    
+    # Try different column names for protein identifiers
+    id_column = None
+    for col in ['seq_id', 'id', 'name', 'protein', 'protein_id', 'sequence_id']:
+        if col in input_df.columns:
+            id_column = col
+            break
+    
+    # If no standard column is found, just use the first column
+    if id_column is None:
+        print(f"Warning: No standard ID column found in {input_csv_path}. Using first column.")
+        id_column = input_df.columns[0]
+        
+    print(f"Using '{id_column}' column for protein identifiers")
+    protein_names = input_df[id_column].tolist()
     
     # Create a dictionary with default values
     feature_data = {'protein name': protein_names}
