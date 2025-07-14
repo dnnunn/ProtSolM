@@ -197,7 +197,9 @@ if __name__ == '__main__':
     parser.add_argument('--out_file', type=str)
     args = parser.parse_args()
     
-    os.makedirs(os.path.dirname(args.out_file), exist_ok=True)
+    out_dir = os.path.dirname(args.out_file)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     
     property_dict = {}
     all_entries = os.listdir(args.pdb_dir)
