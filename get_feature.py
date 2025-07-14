@@ -175,15 +175,18 @@ if __name__ == '__main__':
     property_dict = {}
     all_entries = os.listdir(args.pdb_dir)
     pdb_files = [f for f in all_entries if os.path.isfile(os.path.join(args.pdb_dir, f)) and f.endswith('.pdb')]
+    print("PDB files to process:", pdb_files)
+    for f in pdb_files:
+        full_path = os.path.join(args.pdb_dir, f)
+        print(f"{f}: isfile={os.path.isfile(full_path)}, size={os.path.getsize(full_path)}")
     
     def process_pdb(pdb_file):
         features, error = generate_feature(os.path.join(args.pdb_dir, pdb_file))
+        if error or not isinstance(features, dict):
+            print(f"Skipping {pdb_file}: error={error}, features type={type(features)}")
+            return None
         properties_seq = properties_from_sequence(features)
         properties_dssp = properties_from_dssp(features)
-        
-        if error:
-            return None
-
         properties = {}
         properties.update(properties_seq)
         properties.update(properties_dssp)
