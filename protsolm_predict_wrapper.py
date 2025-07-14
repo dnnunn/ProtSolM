@@ -254,11 +254,20 @@ def setup_custom_dataset(input_csv, structures_dir=None):
                                 print(f"Created sanitized PDB file: {pdb_file}")
                             # Standard PDB file validation
                             elif first_line.startswith(('HEADER', 'TITLE', 'COMPND', 'ATOM', 'MODEL', 'REMARK')):
-                                # It's a valid PDB file, copy it
-                                shutil.copy(src, dst)
-                                linked_count += 1
-                                processed_files.append(os.path.splitext(pdb_file)[0])
-                                print(f"Copied valid PDB file: {pdb_file}")
+                                # It's a valid PDB file, copy it (use shutil.copyfile to ensure it's a file, not symlink)
+                                try:
+                                    # Force direct file copy with no symlinks
+                                    shutil.copyfile(src, dst)
+                                    # Verify the copied file exists and is a file
+                                    if os.path.isfile(dst):
+                                        print(f"Successfully copied PDB file: {dst} (size: {os.path.getsize(dst)} bytes)")
+                                        linked_count += 1
+                                        processed_files.append(os.path.splitext(pdb_file)[0])
+                                    else:
+                                        print(f"ERROR: Copy succeeded but {dst} is not a file! Type: {os.stat(dst).st_mode}")
+                                except Exception as copy_err:
+                                    print(f"ERROR copying {src} to {dst}: {copy_err}")
+                                    invalid_count += 1
                             else:
                                 print(f"Warning: {pdb_file} does not appear to be a valid PDB file. First line: {first_line}")
                                 invalid_count += 1
@@ -296,13 +305,68 @@ def setup_custom_dataset(input_csv, structures_dir=None):
                     pdb_file = os.path.join(pdb_dir, f"{protein_id}.pdb")
                     print(f"Processing {pdb_file} for feature extraction...")
                     
-                    # Parse PDB file
-                    parser = PDBParser(QUIET=True)
-                    structure = parser.get_structure(protein_id, pdb_file)
-                    model = structure[0]
+                    # Verify file exists and is an actual file, not a directory
+                    if not os.path.exists(pdb_file):
+                        print(f"ERROR: PDB file {pdb_file} does not exist!")
+                        continue
                     
-                    # Run DSSP
-                    dssp = DSSP(model, pdb_file, dssp='mkdssp')
+                    if not os.path.isfile(pdb_file):
+                        print(f"ERROR: {pdb_file} exists but is not a file (may be a directory)!")
+                        continue
+                        
+                    # Check file size is reasonable
+                    file_size = os.path.getsize(pdb_file)
+                    if file_size < 100:  # Sanity check for minimal PDB size
+                        print(f"ERROR: {pdb_file} is too small ({file_size} bytes), likely invalid")
+                        continue
+                    
+                    # Extra verification of file content
+                    try:
+                        with open(pdb_file, 'r') as f:
+                            first_lines = [f.readline().strip() for _ in range(5)]
+                            if not any(line.startswith(('HEADER', 'TITLE', 'COMPND', 'ATOM', 'MODEL', 'REMARK')) for line in first_lines):
+                                print(f"ERROR: {pdb_file} doesn't contain valid PDB headers in first 5 lines")
+                                continue
+                    except Exception as file_err:
+                        print(f"ERROR reading {pdb_file}: {file_err}")
+                        continue
+                    
+                    print(f"Verified {pdb_file} exists as a file, size: {file_size} bytes")
+                    
+                    # Parse PDB file with proper error handling
+                    try:
+                        parser = PDBParser(QUIET=True)
+                        structure = parser.get_structure(protein_id, pdb_file)
+                        if not structure.get_list() or not structure[0].get_list():  # Check structure and first model
+                            print(f"ERROR: No valid models found in {pdb_file}")
+                            continue
+                        model = structure[0]
+                    except Exception as parse_err:
+                        print(f"ERROR parsing PDB {pdb_file}: {parse_err}")
+                        continue
+                    
+                    # Run DSSP with extra error handling
+                    try:
+                        # Set environment variable for DSSP if not set
+                        if 'LIBCIFPP_DATA_DIR' not in os.environ:
+                            os.environ['LIBCIFPP_DATA_DIR'] = '/home/david_nunn/miniconda3/envs/ProtSolM/share/libcifpp'
+                            print("Set LIBCIFPP_DATA_DIR environment variable for DSSP")
+                            
+                        # Try running DSSP with explicit path
+                        dssp = DSSP(model, pdb_file, dssp='mkdssp')
+                    except Exception as dssp_err:
+                        print(f"DSSP failed on {pdb_file}: {dssp_err}")
+                        # Try with different DSSP path as fallback
+                        try:
+                            print("Retrying DSSP with alternate executable path...")
+                            # Look for mkdssp in PATH
+                            import subprocess
+                            dssp_path = subprocess.check_output(['which', 'mkdssp']).decode().strip()
+                            print(f"Found mkdssp at: {dssp_path}")
+                            dssp = DSSP(model, pdb_file, dssp=dssp_path)
+                        except Exception as retry_err:
+                            print(f"DSSP retry failed: {retry_err}")
+                            continue
                     
                     # Extract secondary structure composition
                     ss_counts = {'H': 0, 'E': 0, 'C': 0}  # helix, sheet, coil
@@ -399,6 +463,35 @@ def run_protsolm(input_csv, output_dir, structures_dir=None):
     # Use absolute paths for input and output
     abs_input_csv = os.path.abspath(input_csv)
     abs_output_dir = os.path.abspath(output_dir)
+    
+    # Clean up any existing problematic custom dataset directory
+    custom_dataset_path = os.path.join(protsolm_dir, 'custom_dataset')
+    if os.path.exists(custom_dataset_path):
+        print(f"Removing existing custom dataset directory: {custom_dataset_path}")
+        try:
+            shutil.rmtree(custom_dataset_path)
+            print("Successfully removed old custom dataset directory")
+        except Exception as e:
+            print(f"Warning: Could not completely remove directory: {e}")
+            # Try removing individual files if rmtree fails
+            try:
+                pdb_dir = os.path.join(custom_dataset_path, 'pdb')
+                if os.path.exists(pdb_dir):
+                    for item in os.listdir(pdb_dir):
+                        item_path = os.path.join(pdb_dir, item)
+                        try:
+                            if os.path.isfile(item_path):
+                                os.unlink(item_path)
+                            elif os.path.isdir(item_path):
+                                shutil.rmtree(item_path)
+                        except Exception as err:
+                            print(f"Failed to remove {item_path}: {err}")
+            except Exception as err:
+                print(f"Failed during manual cleanup: {err}")
+    
+    # Set environment variables needed by DSSP
+    os.environ['LIBCIFPP_DATA_DIR'] = '/home/david_nunn/miniconda3/envs/ProtSolM/share/libcifpp'
+    print(f"Set LIBCIFPP_DATA_DIR environment variable for DSSP to {os.environ['LIBCIFPP_DATA_DIR']}")
     
     # Save current directory
     cwd = os.getcwd()
