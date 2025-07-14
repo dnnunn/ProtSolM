@@ -202,11 +202,16 @@ if __name__ == '__main__':
         os.makedirs(out_dir, exist_ok=True)
     
     property_dict = {}
-    all_entries = os.listdir(args.pdb_dir)
-    pdb_files = [f for f in all_entries if os.path.isfile(os.path.join(args.pdb_dir, f)) and f.endswith('.pdb')]
+    if args.pdb_file:
+        pdb_files = [os.path.basename(args.pdb_file)]
+        pdb_dir = os.path.dirname(args.pdb_file) or '.'
+    else:
+        all_entries = os.listdir(args.pdb_dir)
+        pdb_files = [f for f in all_entries if os.path.isfile(os.path.join(args.pdb_dir, f)) and f.endswith('.pdb')]
+        pdb_dir = args.pdb_dir
     print("PDB files to process:", pdb_files)
     for f in pdb_files:
-        full_path = os.path.join(args.pdb_dir, f)
+        full_path = os.path.join(pdb_dir, f)
         print(f"{f}: isfile={os.path.isfile(full_path)}, size={os.path.getsize(full_path)}")
     
     def process_pdb(pdb_file):
