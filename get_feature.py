@@ -214,8 +214,8 @@ if __name__ == '__main__':
         full_path = os.path.join(pdb_dir, f)
         print(f"{f}: isfile={os.path.isfile(full_path)}, size={os.path.getsize(full_path)}")
     
-    def process_pdb(pdb_file):
-        features, error = generate_feature(os.path.join(args.pdb_dir, pdb_file))
+    def process_pdb(pdb_file, pdb_dir):
+        features, error = generate_feature(os.path.join(pdb_dir, pdb_file))
         if error or not isinstance(features, dict):
             print(f"Skipping {pdb_file}: error={error}, features type={type(features)}")
             return None
@@ -227,7 +227,7 @@ if __name__ == '__main__':
         return properties
 
     with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
-        futures = [executor.submit(process_pdb, pdb) for pdb in pdb_files]
+        futures = [executor.submit(process_pdb, pdb, pdb_dir) for pdb in pdb_files]
         for future in tqdm(as_completed(futures), total=len(pdb_files)):
             properties = future.result()
             if properties is not None:
