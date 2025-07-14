@@ -144,6 +144,13 @@ def run_protsolm(input_csv, output_dir, structures_dir=None):
         # Use the custom dataset feature file
         feature_file = os.path.join(custom_dataset_dir, 'custom_feature.csv')
         
+        # Check if feature file exists and is not empty
+        feature_file_valid = os.path.exists(feature_file) and os.path.getsize(feature_file) > 0
+        if not feature_file_valid:
+            print(f"Warning: Feature file {feature_file} is missing or empty. Using fallback feature generation.")
+            # Create a fallback feature file with zeros if feature generation failed
+            create_fallback_feature_file(feature_file, abs_input_csv)
+            
         # Find the model file in the ckpt directory
         model_path = os.path.join(protsolm_dir, 'ckpt', 'feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt')
         if not os.path.exists(model_path):
