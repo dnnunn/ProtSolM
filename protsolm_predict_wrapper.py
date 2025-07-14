@@ -66,38 +66,43 @@ def create_fallback_feature_file(feature_file_path, input_csv_path):
     # Create a dictionary with default values
     feature_data = {'protein name': protein_names}
     
-    # Required amino acid composition features
+    # Exactly match the feature names from eval.py
+    
+    # Amino acid composition features (from eval.py line ~193)
     aa_composition_features = [
-        '1-C', '1-D', '1-E', '1-F', '1-G', '1-A', '1-H', '1-K', '1-M', '1-L',
-        '1-N', '1-Q', '1-P', '1-S', '1-R', '1-T', '1-W', '1-V', '1-Y', '1-I',
-        'Turn-forming residues fraction'
+        '1-C', '1-D', '1-E', '1-R', '1-H', 'Turn-forming residues fraction'
     ]
     
-    # Required secondary structure composition features
-    ss_composition_features = [
-        'E_fraction', 'H_fraction', 'C_fraction', 'Regular_alpha_fraction',
-        'Regular_beta_fraction', 'Irregular_fraction'
-    ]
-    
-    # Required hydrogen bond features
-    hydrogen_bond_features = [
-        'ss_hbond_energy_per_residue', 'hbond_energy_per_residue'
-    ]
-    
-    # Required exposed residue fraction features
-    exposed_res_features = ['exposed_residues_fraction']
-    
-    # Required pLDDT features
-    plddt_features = ['avg_plddt', 'min_plddt']
-    
-    # Required gravy features - NOTE: This must be uppercase 'GRAVY'
+    # GRAVY features (from eval.py line ~198) - Note: uppercase
     gravy_features = ['GRAVY']
     
-    # Additional features that might be expected
-    additional_features = [
-        'isoelectric_point', 'hydrophobicity', 'aromaticity',
-        'molecular_weight', 'instability_index', 'aliphatic_index'
+    # Secondary structure composition features (from eval.py line ~203)
+    ss_composition_features = [
+        'ss8-G', 'ss8-H', 'ss8-I', 'ss8-B', 'ss8-E', 'ss8-T', 'ss8-S', 'ss8-P', 'ss8-L',
+        'ss3-H', 'ss3-E', 'ss3-C'
     ]
+    
+    # Hydrogen bond features (from eval.py line ~208)
+    hydrogen_bond_features = [
+        'Hydrogen bonds', 'Hydrogen bonds per 100 residues'
+    ]
+    
+    # Exposed residue fraction features (from eval.py line ~213)
+    exposed_res_features = [
+        'Exposed residues fraction by 5%', 'Exposed residues fraction by 10%', 'Exposed residues fraction by 15%',
+        'Exposed residues fraction by 20%', 'Exposed residues fraction by 25%', 'Exposed residues fraction by 30%',
+        'Exposed residues fraction by 35%', 'Exposed residues fraction by 40%', 'Exposed residues fraction by 45%',
+        'Exposed residues fraction by 50%', 'Exposed residues fraction by 55%', 'Exposed residues fraction by 60%',
+        'Exposed residues fraction by 65%', 'Exposed residues fraction by 70%', 'Exposed residues fraction by 75%',
+        'Exposed residues fraction by 80%', 'Exposed residues fraction by 85%', 'Exposed residues fraction by 90%',
+        'Exposed residues fraction by 95%', 'Exposed residues fraction by 100%'
+    ]
+    
+    # pLDDT features (from eval.py line ~226) - Note: mixed case
+    plddt_features = ['pLDDT']
+    
+    # Additional features for potential compatibility
+    additional_features = []
     
     # Combine all features
     all_features = aa_composition_features + ss_composition_features + \
