@@ -41,34 +41,72 @@ def fasta_to_csv(fasta_path, csv_path):
 
 def create_fallback_feature_file(feature_file_path, input_csv_path):
     """Create a fallback feature file with default values if feature generation failed"""
-    import csv
+    import pandas as pd
+    
+    print(f"Creating fallback feature file at {feature_file_path}")
     
     # Read the input CSV to get protein names
-    with open(input_csv_path, 'r') as f:
-        reader = csv.reader(f)
-        # Skip header
-        next(reader, None)
-        # Extract protein names
-        protein_names = [row[0] for row in reader if len(row) > 0]
+    input_df = pd.read_csv(input_csv_path)
+    protein_names = input_df['seq_id'].tolist()
     
-    # Create minimal feature dictionary with zeros
-    feature_dict = {
-        'protein name': protein_names,
-        'L': [100] * len(protein_names),  # Default length
-        'GRAVY': [0.0] * len(protein_names),  # Default hydrophobicity
-        'ss3-H': [0.33] * len(protein_names),  # Default secondary structure
-        'ss3-E': [0.33] * len(protein_names),
-        'ss3-C': [0.34] * len(protein_names),
-        'Hydrogen bonds': [0] * len(protein_names),
-        'pLDDT': [70.0] * len(protein_names)  # Default confidence score
-    }
+    # Create a dictionary with default values
+    feature_data = {'protein name': protein_names}
+    
+    # Required amino acid composition features
+    aa_composition_features = [
+        '1-C', '1-D', '1-E', '1-F', '1-G', '1-A', '1-H', '1-K', '1-M', '1-L',
+        '1-N', '1-Q', '1-P', '1-S', '1-R', '1-T', '1-W', '1-V', '1-Y', '1-I',
+        'Turn-forming residues fraction'
+    ]
+    
+    # Required secondary structure composition features
+    ss_composition_features = [
+        'E_fraction', 'H_fraction', 'C_fraction', 'Regular_alpha_fraction',
+        'Regular_beta_fraction', 'Irregular_fraction'
+    ]
+    
+    # Required hydrogen bond features
+    hydrogen_bond_features = [
+        'ss_hbond_energy_per_residue', 'hbond_energy_per_residue'
+    ]
+    
+    # Required exposed residue fraction features
+    exposed_res_features = ['exposed_residues_fraction']
+    
+    # Required pLDDT features
+    plddt_features = ['avg_plddt', 'min_plddt']
+    
+    # Required gravy features
+    gravy_features = ['gravy']
+    
+    # Additional features that might be expected
+    additional_features = [
+        'isoelectric_point', 'hydrophobicity', 'aromaticity',
+        'molecular_weight', 'instability_index', 'aliphatic_index'
+    ]
+    
+    # Combine all features
+    all_features = aa_composition_features + ss_composition_features + \
+                   hydrogen_bond_features + exposed_res_features + \
+                   plddt_features + gravy_features + additional_features
+    
+    # Add default feature values (zeros) for each feature
+    for feature in all_features:
+        feature_data[feature] = [0.0] * len(protein_names)
+    
+    # Create the DataFrame and save to CSV
+    feature_df = pd.DataFrame(feature_data)
     
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(feature_file_path), exist_ok=True)
     
-    # Save as CSV
-    pd.DataFrame(feature_dict).to_csv(feature_file_path, index=False)
-    print(f"Created fallback feature file at {feature_file_path} with default values")
+    # Save to CSV
+    feature_df.to_csv(feature_file_path, index=False)
+    
+    print(f"Fallback feature file created with {len(all_features)} features for {len(protein_names)} proteins")
+    print(f"Fallback feature file saved to {feature_file_path}")
+    
+    return feature_file_path
 
 def setup_custom_dataset(input_csv, structures_dir=None):
     """Set up a custom dataset directory with PDB files for ProtSolM to use"""
