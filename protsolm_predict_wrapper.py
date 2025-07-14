@@ -16,7 +16,11 @@ import subprocess
 import shutil
 import tempfile
 import pandas as pd
+import logging
 from Bio import SeqIO
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def fasta_to_csv(fasta_path, csv_path):
     """Convert a FASTA file to a CSV file with columns name, aa_seq, and label"""
@@ -42,6 +46,9 @@ def fasta_to_csv(fasta_path, csv_path):
 def create_fallback_feature_file(feature_file_path, input_csv_path):
     """Create a fallback feature file with default values if feature generation failed"""
     import pandas as pd
+    
+    logging.warning(f"Creating FALLBACK feature file with ZERO VALUES: {feature_file_path}")
+    logging.warning(f"NOTE: These are placeholder features and may affect prediction accuracy")
     
     print(f"Creating fallback feature file at {feature_file_path}")
     
@@ -152,11 +159,31 @@ def setup_custom_dataset(input_csv, structures_dir=None):
             print(f"Found {len(pdb_files)} PDB files in {structures_dir}")
             
             # Link each PDB file to the custom pdb directory
+            linked_count = 0
             for pdb_file in pdb_files:
                 src = os.path.join(structures_dir, pdb_file)
                 dst = os.path.join(pdb_dir, pdb_file)
-                if not os.path.exists(dst):
-                    os.symlink(src, dst)
+                
+                # Check if source is a file or directory
+                if os.path.isfile(src):
+                    # It's a regular file, just link it
+                    if not os.path.exists(dst):
+                        shutil.copy(src, dst)
+                        linked_count += 1
+                elif os.path.isdir(src):
+                    # It's a directory - find a PDB file inside it
+                    print(f"Warning: {pdb_file} is a directory, not a file")
+                    inner_pdb_files = [f for f in os.listdir(src) if f.endswith('.pdb')]
+                    if inner_pdb_files:
+                        # Use the first PDB file found
+                        inner_src = os.path.join(src, inner_pdb_files[0])
+                        print(f"Using {inner_pdb_files[0]} from directory {pdb_file}")
+                        shutil.copy(inner_src, dst)
+                        linked_count += 1
+                    else:
+                        print(f"Warning: No PDB files found in directory {src}")
+            
+            print(f"Processed {len(pdb_files)} PDB entries, successfully linked/copied {linked_count}")
             print(f"Linked {len(pdb_files)} PDB files to custom dataset directory")
             
             # Generate features for the custom PDB files
@@ -248,12 +275,24 @@ def run_protsolm(input_csv, output_dir, structures_dir=None):
         else:
             print(f"Warning: Feature file {feature_file} is missing or empty.")
             
-        # Create fallback feature file if needed
+        # Create a fallback feature file if feature extraction fails
         if not feature_file_valid:
-            print("Using fallback feature generation.")
-            # Create a fallback feature file with zeros if feature generation failed
-            create_fallback_feature_file(feature_file, abs_input_csv)
+            logging.warning(f"========================= WARNING ==========================")
+            logging.warning(f"Feature file validation failed. Creating FALLBACK feature file...")
+            logging.warning(f"This means real features could not be extracted from the PDB files")
+            logging.warning(f"Predictions made with fallback features may be less accurate")
+            logging.warning(f"========================= WARNING ==========================")
+            create_fallback_feature_file(abs_input_csv, feature_file)
             
+            # Verify the fallback feature file was created properly
+            if not validate_feature_file(feature_file):
+                raise FileNotFoundError(f"Failed to create valid fallback feature file.")
+            else:
+                logging.warning(f"========================= NOTICE ==========================")
+                logging.warning(f"FALLBACK feature file created and validated successfully")
+                logging.warning(f"Predictions will be made with zeros/defaults for all features")
+                logging.warning(f"========================= NOTICE ===========================")
+        
         # Find the model file in the ckpt directory
         model_path = os.path.join(protsolm_dir, 'ckpt', 'feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt')
         if not os.path.exists(model_path):
