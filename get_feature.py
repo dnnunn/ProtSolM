@@ -173,28 +173,21 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname(args.out_file), exist_ok=True)
     
     property_dict = {}
-    pdb_files = os.listdir(args.pdb_dir)
+    all_entries = os.listdir(args.pdb_dir)
+    pdb_files = [f for f in all_entries if os.path.isfile(os.path.join(args.pdb_dir, f)) and f.endswith('.pdb')]
     
     def process_pdb(pdb_file):
         features, error = generate_feature(os.path.join(args.pdb_dir, pdb_file))
+        properties_seq = properties_from_sequence(features)
+        properties_dssp = properties_from_dssp(features)
         
-        # Check for errors first
         if error:
-            print(f"Error processing {pdb_file}: {error}")
             return None
-            
-        # Only process features if there's no error
-        try:
-            properties_seq = properties_from_sequence(features)
-            properties_dssp = properties_from_dssp(features)
 
-            properties = {}
-            properties.update(properties_seq)
-            properties.update(properties_dssp)
-            return properties
-        except Exception as e:
-            print(f"Error extracting properties from {pdb_file}: {e}")
-            return None
+        properties = {}
+        properties.update(properties_seq)
+        properties.update(properties_dssp)
+        return properties
 
     with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
         futures = [executor.submit(process_pdb, pdb) for pdb in pdb_files]
@@ -207,4 +200,3 @@ if __name__ == '__main__':
                     property_dict[k].append(v)
     
     pd.DataFrame(property_dict).to_csv(args.out_file, index=False)
-
