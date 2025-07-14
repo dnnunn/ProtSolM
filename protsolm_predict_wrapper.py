@@ -187,93 +187,205 @@ def create_fallback_feature_file(input_csv_path, feature_file_path):
     return feature_file_path
 
 def setup_custom_dataset(input_csv, structures_dir=None):
-    """Set up a custom dataset directory with PDB files for ProtSolM to use"""
-    # Get the ProtSolM root directory
-    protsolm_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Define custom dataset location
-    custom_dataset_dir = os.path.join(protsolm_dir, 'custom_dataset')
+    """Set up a custom dataset directory with PDB files for ProtSolM.
+
+    Args:
+        input_csv (str): Path to input CSV file.
+        structures_dir (str, optional): Path to directory with PDB structures.
+
+    Returns:
+        str: Path to custom dataset directory.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    custom_dataset_dir = os.path.join(script_dir, 'custom_dataset')
     os.makedirs(custom_dataset_dir, exist_ok=True)
-    
-    # Create PDB directory
+
+    # Copy the input CSV to the custom dataset dir
+    shutil.copy(input_csv, os.path.join(custom_dataset_dir, 'input.csv'))
+
+    # Create a directory for PDB files
     pdb_dir = os.path.join(custom_dataset_dir, 'pdb')
     os.makedirs(pdb_dir, exist_ok=True)
+
+    # Force feature file regeneration by removing existing feature file
+    feature_file = os.path.join(custom_dataset_dir, 'custom_feature.csv')
+    if os.path.exists(feature_file):
+        print(f"Removing existing feature file to force regeneration: {feature_file}")
+        os.remove(feature_file)
+        
+    # If structures_dir is provided, copy or link PDB files to the custom dataset
+    linked_count = 0
+    invalid_count = 0
+    processed_files = []
     
-    # Copy the input CSV as test.csv in the custom dataset directory
-    shutil.copy(input_csv, os.path.join(custom_dataset_dir, 'test.csv'))
-    
-    # Link PDB files from structures_dir to custom_dataset_dir/pdb if provided
-    if structures_dir and os.path.exists(structures_dir):
-        print(f"Linking PDB files from {structures_dir} to {pdb_dir}")
+    if structures_dir and os.path.isdir(structures_dir):
+        # Get a list of all PDB files in the structures directory
+        pdb_files = [f for f in os.listdir(structures_dir) if f.endswith('.pdb')]
+        print(f"Found {len(pdb_files)} PDB files in {structures_dir}")
+
+        for pdb_file in pdb_files:
+            src = os.path.join(structures_dir, pdb_file)
+            dst = os.path.join(pdb_dir, pdb_file)
+            
+            # Only process if it's a file (skip directories)
+            if os.path.isfile(src):
+                try:
+                    # Check if it's a valid PDB file by looking at the first few lines
+                    try:
+                        with open(src, 'r') as f:
+                            first_line = f.readline().strip()
+                            second_line = f.readline().strip() if first_line else ""
+                            
+                            # Special case for files starting with "PARENT N/A" followed by ATOM records
+                            if first_line.startswith('PARENT') and second_line.startswith('ATOM'):
+                                # Create a sanitized version of the PDB file without the PARENT line
+                                print(f"Sanitizing PDB file with PARENT line: {pdb_file}")
+                                sanitized_file = dst
+                                with open(src, 'r') as input_file, open(sanitized_file, 'w') as output_file:
+                                    # Skip the first line (PARENT line)
+                                    next(input_file)
+                                    # Write a standard REMARK line instead
+                                    output_file.write("REMARK   1 File sanitized to remove unsupported PARENT record\n")
+                                    # Copy the rest of the file
+                                    for line in input_file:
+                                        output_file.write(line)
+                                linked_count += 1
+                                processed_files.append(os.path.splitext(pdb_file)[0])
+                                print(f"Created sanitized PDB file: {pdb_file}")
+                            # Standard PDB file validation
+                            elif first_line.startswith(('HEADER', 'TITLE', 'COMPND', 'ATOM', 'MODEL', 'REMARK')):
+                                # It's a valid PDB file, copy it
+                                shutil.copy(src, dst)
+                                linked_count += 1
+                                processed_files.append(os.path.splitext(pdb_file)[0])
+                                print(f"Copied valid PDB file: {pdb_file}")
+                            else:
+                                print(f"Warning: {pdb_file} does not appear to be a valid PDB file. First line: {first_line}")
+                                invalid_count += 1
+                    except UnicodeDecodeError:
+                        print(f"Warning: {pdb_file} appears to be a binary file, skipping.")
+                        invalid_count += 1
+                except Exception as e:
+                    print(f"Error processing {pdb_file}: {e}")
+                    invalid_count += 1
+            elif os.path.isdir(src):
+                print(f"Warning: {pdb_file} is a directory, skipping.")
+                invalid_count += 1
+
+        print(f"Processed {linked_count} valid PDB files to {pdb_dir}.")
+        if invalid_count > 0:
+            print(f"Skipped {invalid_count} invalid files.")
+
+    # Run DSSP to generate features for the dataset
+    # This will invoke feature generation explicitly instead of relying on the internal process
+    if linked_count > 0:
+        print(f"Generating features for {linked_count} PDB files...")
         try:
-            # Get list of PDB files in structures_dir
-            pdb_files = [f for f in os.listdir(structures_dir) if f.endswith('.pdb')]
-            print(f"Found {len(pdb_files)} PDB files in {structures_dir}")
+            # Import necessary libraries for feature generation
+            from Bio.PDB import PDBParser, DSSP
+            import pandas as pd
+            import numpy as np
             
-            # Link each PDB file to the custom pdb directory
-            linked_count = 0
-            for pdb_file in pdb_files:
-                src = os.path.join(structures_dir, pdb_file)
-                dst = os.path.join(pdb_dir, pdb_file)
-                
-                # Check if source is a file or directory
-                if os.path.isfile(src):
-                    # It's a regular file, just link it
-                    if not os.path.exists(dst):
-                        shutil.copy(src, dst)
-                        linked_count += 1
-                elif os.path.isdir(src):
-                    # It's a directory - find a PDB file inside it
-                    print(f"Warning: {pdb_file} is a directory, not a file")
-                    inner_pdb_files = [f for f in os.listdir(src) if f.endswith('.pdb')]
-                    if inner_pdb_files:
-                        # Use the first PDB file found
-                        inner_src = os.path.join(src, inner_pdb_files[0])
-                        print(f"Using {inner_pdb_files[0]} from directory {pdb_file}")
-                        shutil.copy(inner_src, dst)
-                        linked_count += 1
-                    else:
-                        print(f"Warning: No PDB files found in directory {src}")
+            # Create empty feature dataframe
+            feature_columns = ['pdb_id', 'aa_composition', 'gravy', 'ss_composition', 'hygrogen_bonds', 'exposed_res_fraction', 'pLDDT']
+            feature_df = pd.DataFrame(columns=feature_columns)
             
-            print(f"Processed {len(pdb_files)} PDB entries, successfully linked/copied {linked_count}")
-            print(f"Linked {len(pdb_files)} PDB files to custom dataset directory")
+            # Process each valid PDB file
+            for protein_id in processed_files:
+                try:
+                    pdb_file = os.path.join(pdb_dir, f"{protein_id}.pdb")
+                    print(f"Processing {pdb_file} for feature extraction...")
+                    
+                    # Parse PDB file
+                    parser = PDBParser(QUIET=True)
+                    structure = parser.get_structure(protein_id, pdb_file)
+                    model = structure[0]
+                    
+                    # Run DSSP
+                    dssp = DSSP(model, pdb_file, dssp='mkdssp')
+                    
+                    # Extract secondary structure composition
+                    ss_counts = {'H': 0, 'E': 0, 'C': 0}  # helix, sheet, coil
+                    total_res = 0
+                    exposed_res = 0
+                    h_bonds = 0
+                    
+                    # Process DSSP results
+                    for key in dssp.keys():
+                        res_data = dssp[key]
+                        ss = res_data[2]  # Secondary structure
+                        if ss in ['-', 'T', 'S']:  # Map irregular structures to coil
+                            ss = 'C'
+                        if ss in ['G', 'I']:  # Map 3-10 helix and pi-helix to alpha-helix
+                            ss = 'H'
+                        if ss in ['B', 'E']:  # Map beta bridge to sheet
+                            ss = 'E'
+                        
+                        ss_counts[ss] += 1
+                        total_res += 1
+                        
+                        # Check for exposed residues (ASA > 0)
+                        if res_data[3] > 0:  # ASA value
+                            exposed_res += 1
+                            
+                        # Count hydrogen bonds
+                        h_bonds += abs(res_data[6]) + abs(res_data[7])  # NH-->O and O-->NH
+                    
+                    # Calculate metrics
+                    ss_composition = f"{ss_counts['H']/max(1, total_res):.4f},{ss_counts['E']/max(1, total_res):.4f},{ss_counts['C']/max(1, total_res):.4f}"
+                    exposed_fraction = f"{exposed_res/max(1, total_res):.4f}"
+                    h_bond_density = f"{h_bonds/max(1, total_res):.4f}"
+                    
+                    # Extract sequence for AA composition and GRAVY
+                    sequence = ''.join([dssp[key][1] for key in sorted(dssp.keys())])
+                    
+                    # Calculate AA composition (placeholder calculation)
+                    aa_comp_values = [0] * 20  # 20 standard amino acids
+                    aa_list = 'ACDEFGHIKLMNPQRSTVWY'
+                    for aa in sequence:
+                        if aa in aa_list:
+                            aa_comp_values[aa_list.index(aa)] += 1
+                    aa_comp = ','.join([f"{val/max(1, len(sequence)):.4f}" for val in aa_comp_values])
+                    
+                    # Calculate GRAVY (Grand average of hydropathy)
+                    hydropathy = {'A': 1.8, 'C': 2.5, 'D': -3.5, 'E': -3.5, 'F': 2.8, 'G': -0.4, 'H': -3.2, 'I': 4.5, 'K': -3.9, 'L': 3.8, 'M': 1.9, 'N': -3.5, 'P': -1.6, 'Q': -3.5, 'R': -4.5, 'S': -0.8, 'T': -0.7, 'V': 4.2, 'W': -0.9, 'Y': -1.3}
+                    gravy_score = sum(hydropathy.get(aa, 0) for aa in sequence) / max(1, len(sequence))
+                    gravy = f"{gravy_score:.4f}"
+                    
+                    # Add to feature dataframe
+                    new_row = {
+                        'pdb_id': protein_id,
+                        'aa_composition': aa_comp,
+                        'gravy': gravy,
+                        'ss_composition': ss_composition,
+                        'hygrogen_bonds': h_bond_density,
+                        'exposed_res_fraction': exposed_fraction,
+                        'pLDDT': '1.0000'  # Default value for actual structures (not predicted)
+                    }
+                    feature_df = pd.concat([feature_df, pd.DataFrame([new_row])], ignore_index=True)
+                    print(f"Successfully extracted features for {protein_id}")
+                    
+                except Exception as e:
+                    print(f"Error extracting features for {protein_id}: {str(e)}")
             
-            # Generate features for the custom PDB files
-            feature_dst = os.path.join(custom_dataset_dir, 'custom_feature.csv')
-            print(f"Generating features for {len(pdb_files)} PDB files...")
+            # Save feature dataframe to CSV
+            feature_df.to_csv(feature_file, index=False)
+            print(f"Generated feature file at {feature_file} with {len(feature_df)} entries")
             
-            # Run feature generation
-            cmd = [
-                'python', os.path.join(protsolm_dir, 'get_feature.py'),
-                '--pdb_dir', pdb_dir,
-                '--out_file', feature_dst,
-                '--num_workers', '4'  # Using fewer workers to avoid memory issues
-            ]
-            
-            try:
-                subprocess.run(cmd, check=True, cwd=protsolm_dir)
-                print(f"Features successfully generated and saved to {feature_dst}")
-            except subprocess.CalledProcessError as e:
-                print(f"Error generating features: {e}")
-                # If feature generation fails, use the default feature file as fallback
-                feature_src = os.path.join(protsolm_dir, 'data', 'PDBSol', 'PDBSol_feature.csv')
-                shutil.copy(feature_src, feature_dst)
-                print(f"Falling back to copied feature file from {feature_src} to {feature_dst}")
         except Exception as e:
-            print(f"Error processing PDB files: {e}")
+            print(f"Error during feature generation: {str(e)}")
+            # Fall back to default feature file if available
+            default_feature = os.path.join(script_dir, 'data', 'PDBSol', 'PDBSol_feature.csv')
+            if os.path.exists(default_feature):
+                shutil.copy(default_feature, feature_file)
+                print(f"Copied default feature file from {default_feature} to {feature_file} due to error")
     else:
-        # If no structures provided, use a default feature file as fallback
-        for dataset_name in ['PDBSol', 'ExternalTest']:
-            src_path = os.path.join(protsolm_dir, 'data', dataset_name)
-            if os.path.exists(src_path):
-                feature_files = [f for f in os.listdir(src_path) if f.endswith('_feature.csv')]
-                if feature_files:
-                    src_feature = os.path.join(src_path, feature_files[0])
-                    dst_feature = os.path.join(custom_dataset_dir, 'custom_feature.csv')
-                    shutil.copy(src_feature, dst_feature)
-                    print(f"Copied feature file from {src_feature} to {dst_feature}")
-                    break
-    
+        # No valid PDB files were processed, fall back to the default feature file
+        default_feature = os.path.join(script_dir, 'data', 'PDBSol', 'PDBSol_feature.csv')
+        if os.path.exists(default_feature):
+            shutil.copy(default_feature, feature_file)
+            print(f"No valid PDB files processed. Copied default feature file from {default_feature} to {feature_file}")
+
     return custom_dataset_dir
 
 def run_protsolm(input_csv, output_dir, structures_dir=None):

@@ -183,3 +183,4 @@ wandb/
 log/
 script_tmp/
 script_dev/
+*.gz
