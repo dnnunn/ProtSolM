@@ -177,16 +177,24 @@ if __name__ == '__main__':
     
     def process_pdb(pdb_file):
         features, error = generate_feature(os.path.join(args.pdb_dir, pdb_file))
-        properties_seq = properties_from_sequence(features)
-        properties_dssp = properties_from_dssp(features)
         
+        # Check for errors first
         if error:
+            print(f"Error processing {pdb_file}: {error}")
             return None
+            
+        # Only process features if there's no error
+        try:
+            properties_seq = properties_from_sequence(features)
+            properties_dssp = properties_from_dssp(features)
 
-        properties = {}
-        properties.update(properties_seq)
-        properties.update(properties_dssp)
-        return properties
+            properties = {}
+            properties.update(properties_seq)
+            properties.update(properties_dssp)
+            return properties
+        except Exception as e:
+            print(f"Error extracting properties from {pdb_file}: {e}")
+            return None
 
     with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
         futures = [executor.submit(process_pdb, pdb) for pdb in pdb_files]
