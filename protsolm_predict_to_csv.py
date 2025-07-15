@@ -79,16 +79,78 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-    # Load features
+    # Load features (EXACT logic from eval.py for full compatibility)
     logger.info("***** Loading Feature *****")
     feature_df = pd.read_csv(args.feature_file).set_index('protein name')
     if 'L' in feature_df.columns:
         feature_df = feature_df.drop('L', axis=1)
-    feature_columns = feature_df.columns
-    args.feature_dim = len(feature_columns)
+    args.feature_dim = 0
     feature_dict = {}
-    for pdb_name, row in feature_df.iterrows():
-        feature_dict[pdb_name] = row.values.astype(float)
+    # Define feature sets as in eval.py
+    feature_aa_composition = [
+        "A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"
+    ]
+    feature_gravy = ["gravy"]
+    feature_ss_composition = ["ss8-G", "ss8-H", "ss8-I", "ss8-B", "ss8-E", "ss8-T", "ss8-S", "ss8-P", "ss8-L", "ss3-H", "ss3-E", "ss3-C"]
+    feature_hygrogen_bonds = ["Hydrogen bonds", "Hydrogen bonds per 100 residues"]
+    feature_exposed_res_fraction = [
+        "Exposed residues fraction by 0%", "Exposed residues fraction by 5%", "Exposed residues fraction by 10%", 
+        "Exposed residues fraction by 15%", "Exposed residues fraction by 20%", "Exposed residues fraction by 25%", 
+        "Exposed residues fraction by 30%", "Exposed residues fraction by 35%", "Exposed residues fraction by 40%", 
+        "Exposed residues fraction by 45%", "Exposed residues fraction by 50%", "Exposed residues fraction by 55%", 
+        "Exposed residues fraction by 60%", "Exposed residues fraction by 65%", "Exposed residues fraction by 70%", 
+        "Exposed residues fraction by 75%", "Exposed residues fraction by 80%", "Exposed residues fraction by 85%", 
+        "Exposed residues fraction by 90%", "Exposed residues fraction by 95%", "Exposed residues fraction by 100%"
+    ]
+    feature_pLDDT = ["pLDDT"]
+    # Parse feature_name as list
+    if isinstance(args.feature_name, str):
+        if args.feature_name.startswith("[") and args.feature_name.endswith("]"):
+            import ast
+            args.feature_name = ast.literal_eval(args.feature_name)
+        else:
+            args.feature_name = [args.feature_name]
+    # Prepare feature sub-frames if needed
+    if "aa_composition" in args.feature_name:
+        aa_composition_df = feature_df[feature_aa_composition]
+        args.feature_dim += len(feature_aa_composition)
+    if "gravy" in args.feature_name:
+        gravy_df = feature_df[feature_gravy]
+        args.feature_dim += len(feature_gravy)
+    if "ss_composition" in args.feature_name:
+        ss_composition_df = feature_df[feature_ss_composition]
+        args.feature_dim += len(feature_ss_composition)
+    if "hygrogen_bonds" in args.feature_name:
+        hygrogen_bonds_df = feature_df[feature_hygrogen_bonds]
+        args.feature_dim += len(feature_hygrogen_bonds)
+    if "exposed_res_fraction" in args.feature_name:
+        exposed_res_fraction_df = feature_df[feature_exposed_res_fraction]
+        args.feature_dim += len(feature_exposed_res_fraction)
+    if "pLDDT" in args.feature_name:
+        plddt_df = feature_df[feature_pLDDT]
+        args.feature_dim += len(feature_pLDDT)
+    # Build feature_dict per protein
+    for i in range(len(feature_df)):
+        name = feature_df.index[i].split(".")[0]
+        feature_dict[name] = []
+        if "aa_composition" in args.feature_name:
+            feature_dict[name] += list(aa_composition_df.iloc[i])
+        if "gravy" in args.feature_name:
+            feature_dict[name] += list(gravy_df.iloc[i])
+        if "ss_composition" in args.feature_name:
+            feature_dict[name] += list(ss_composition_df.iloc[i])
+        if "hygrogen_bonds" in args.feature_name:
+            feature_dict[name] += list(hygrogen_bonds_df.iloc[i])
+        if "exposed_res_fraction" in args.feature_name:
+            feature_dict[name] += list(exposed_res_fraction_df.iloc[i])
+        if "pLDDT" in args.feature_name:
+            feature_dict[name] += list(plddt_df.iloc[i])
+    # If no feature_name matches, fallback to all columns (legacy biotite)
+    if args.feature_dim == 0:
+        feature_columns = feature_df.columns
+        args.feature_dim = len(feature_columns)
+        for pdb_name, row in feature_df.iterrows():
+            feature_dict[pdb_name.split(".")[0]] = row.values.astype(float)
     logger.info("***** Loading Dataset *****")
     test_df = pd.read_csv(args.test_file)
     test_names = test_df['id'].tolist()
