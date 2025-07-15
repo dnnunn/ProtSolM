@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.dataset.supervise_dataset import SuperviseDataset
-from src.utils.utils import set_seed
+
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
     # Manually add hidden_channels to args for SuperviseDataset compatibility
     args.gnn_hidden_dim = args.gnn_config.get('hidden_channels', 512)
-    set_seed(args.seed)
+
 
     logging.info("--- Initializing Dataset to Generate Protein Graphs ---")
     logging.info(f"Reading PDBs from: {args.pdb_path}")
