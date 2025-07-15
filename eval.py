@@ -92,6 +92,10 @@ class EpochRunner:
         ssn_embeds = []
         for batch in loop:
             step_loss, model, metrics_dict, pred_label, ssn_embed = self.steprunner(batch)
+            # Debug: Print raw logits for the batch
+            with torch.no_grad():
+                logits, _ = model(plm_model, gnn_model, batch, True)
+                print("[DEBUG] Raw logits for batch:", logits.detach().cpu().numpy())
             result_dict["pred_label"].extend(pred_label)
             result_dict["name"].extend([data.name for data in batch])
             result_dict["aa_seq"].extend([data.aa_seq for data in batch])
@@ -291,7 +295,10 @@ if __name__ == "__main__":
             seq_dict[name] = seq
             node_nums.append(len(seq))
         return names, node_nums
-    test_names, test_node_nums = get_dataset(pd.read_csv(args.test_file))
+    test_df = pd.read_csv(args.test_file)
+    test_names, test_node_nums = get_dataset(test_df)
+    # Debug: Print unique labels and their counts
+    print("[DEBUG] Test label distribution:", test_df['label'].value_counts().to_dict())
     
     # multi-thread load data will shuffle the order of data
     # so we need to save the information
