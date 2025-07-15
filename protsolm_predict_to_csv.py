@@ -57,14 +57,18 @@ def main():
     parser.add_argument('--test_file', required=True, help='CSV with columns: name, aa_seq, label')
     parser.add_argument('--feature_file', required=True, help='CSV with handcrafted features')
     parser.add_argument('--gnn_model_path', required=True, help='Path to trained GNN model checkpoint')
-    parser.add_argument('--gnn_config', required=True, help='YAML config for GNN')
     parser.add_argument('--gnn', required=True, help='GNN type')
     parser.add_argument('--gnn_hidden_dim', type=int, required=True)
     parser.add_argument('--plm', required=True, help='Path or ID for ESM model')
+    parser.add_argument('--feature_name', default='biotite')
+    parser.add_argument('--feature_dim', type=int, default=512)
+    parser.add_argument('--pooling_method', default='attention1d')
+    parser.add_argument('--plm_hidden_size', type=int, default=1280)
+    parser.add_argument('--pooling_dropout', type=float, default=0.1)
+    parser.add_argument('--num_labels', type=int, default=2)
     parser.add_argument('--batch_token_num', type=int, default=4096)
     parser.add_argument('--max_graph_token_num', type=int, default=1024)
     parser.add_argument('--c_alpha_max_neighbors', type=int, default=32)
-    parser.add_argument('--feature_name', nargs='+', default=["basic", "ss_composition", "exposed_res_fraction", "pLDDT", "gravy"])
     parser.add_argument('--output_csv', required=True, help='Output CSV path for standardized predictions')
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
@@ -72,9 +76,6 @@ def main():
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load GNN config
-    args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
-    args.gnn_config["hidden_channels"] = args.gnn_hidden_dim
 
     # Load features
     logger.info("***** Loading Feature *****")
