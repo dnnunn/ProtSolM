@@ -110,6 +110,10 @@ def main():
 
     # Load models
     logger.info("***** Load Model *****")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Patch: set gnn_config to None if not present
+    if not hasattr(args, "gnn_config"):
+        args.gnn_config = None
     plm_model = PLM_model(args).to(device)
     gnn_model = GNN_model(args).to(device)
     checkpoint = torch.load(args.gnn_model_path)
