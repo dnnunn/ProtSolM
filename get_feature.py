@@ -143,7 +143,7 @@ def generate_feature(pdb_file):
             rsa.append(dssp_res[3])
 
     except Exception as e:
-        return pdb_file, e
+        return pdb_file, str(e) + ' (file: ' + sanitized_pdb_path + ')'
     finally:
         if 'is_temp' in locals() and is_temp:
             print(f"[DEBUG] Not deleting temp sanitized PDB: {sanitized_pdb_path}")
