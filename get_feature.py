@@ -92,14 +92,15 @@ def generate_feature(pdb_file):
     try:
         # extract amino acid sequence
         aa_seq = extract_seq_from_pdb(pdb_file)
-        pdb_for_dssp, is_temp = sanitize_pdb_for_dssp(pdb_file)
+        sanitized_pdb_path = sanitize_pdb_for_dssp(pdb_file)
+        is_temp = True
         pdb_parser = PDB.PDBParser(QUIET=True)
-        structure = pdb_parser.get_structure("protein", pdb_for_dssp)
+        structure = pdb_parser.get_structure("protein", sanitized_pdb_path)
         model = structure[0]
-        print(f"[DEBUG] DSSP input file: {pdb_for_dssp}")
+        print(f"[DEBUG] DSSP input file: {sanitized_pdb_path}")
         try:
             # Try Bio.PDB.DSSP with explicit mkdssp path (should use correct mkdssp invocation)
-            dssp = PDB.DSSP(model, pdb_for_dssp, dssp='mkdssp')
+            dssp = PDB.DSSP(model, sanitized_pdb_path, dssp='mkdssp')
         except Exception as dssp_exc:
             # Fallback: run mkdssp via subprocess with correct arguments, then parse output
             import tempfile
@@ -107,7 +108,7 @@ def generate_feature(pdb_file):
             from Bio.PDB import make_dssp_dict
             tmp_dssp = tempfile.NamedTemporaryFile(delete=False)
             tmp_dssp.close()
-            mkdssp_cmd = ['mkdssp', pdb_for_dssp, tmp_dssp.name]
+            mkdssp_cmd = ['mkdssp', sanitized_pdb_path, tmp_dssp.name]
             print(f"[DEBUG] Running mkdssp command: {' '.join(mkdssp_cmd)}")
             try:
                 with open('mkdssp_debug.log', 'a') as logf:
@@ -120,7 +121,7 @@ def generate_feature(pdb_file):
                 if result.returncode != 0:
                     with open('mkdssp_debug.log', 'r') as logf:
                         log_content = logf.read()
-                    raise RuntimeError(f"mkdssp failed (code {result.returncode}) on {pdb_for_dssp}. Log output:\n{log_content}")
+                    raise RuntimeError(f"mkdssp failed (code {result.returncode}) on {sanitized_pdb_path}. Log output:\n{log_content}")
                 dssp_dict, _ = make_dssp_dict(tmp_dssp.name)
                 # Convert dssp_dict to DSSP-like list for compatibility
                 dssp = [
@@ -128,10 +129,10 @@ def generate_feature(pdb_file):
                     for k, d in dssp_dict.items()
                 ]
             except Exception as sub_exc:
-                return pdb_file, f"Bio.PDB.DSSP failed: {dssp_exc}; mkdssp fallback failed: {sub_exc} (file: {pdb_for_dssp})"
+                return pdb_file, f"Bio.PDB.DSSP failed: {dssp_exc}; mkdssp fallback failed: {sub_exc} (file: {sanitized_pdb_path})"
             finally:
                 os.unlink(tmp_dssp.name)
-        traj = md.load(pdb_for_dssp)
+        traj = md.load(sanitized_pdb_path)
         hbonds = md.kabsch_sander(traj)
 
         sec_structures = []
@@ -144,8 +145,8 @@ def generate_feature(pdb_file):
         return pdb_file, e
     finally:
         if 'is_temp' in locals() and is_temp:
-            print(f"[DEBUG] Not deleting temp sanitized PDB: {pdb_for_dssp}")
-            # os.unlink(pdb_for_dssp)  # Commented out for debugging
+            print(f"[DEBUG] Not deleting temp sanitized PDB: {sanitized_pdb_path}")
+            # os.unlink(sanitized_pdb_path)  # Commented out for debugging
 
     sec_structure_str_8 = ''.join(sec_structures)
     sec_structure_str_8 = sec_structure_str_8.replace('-', 'L')
