@@ -49,7 +49,7 @@ def sanitize_pdb_for_dssp(pdb_file):
             # Parse fields according to PDB format columns (1-indexed)
             record = line[0:6].strip()
             serial = line[6:11].strip()
-            name = line[12:16].strip()
+            name = line[12:16]  # Do not strip, preserve original spacing
             altLoc = line[16:17].strip()
             resName = line[17:20].strip()
             chainID = line[21:22].strip()
@@ -63,7 +63,7 @@ def sanitize_pdb_for_dssp(pdb_file):
             element = line[76:78].strip()
             charge = line[78:80].strip() if len(line) >= 80 else ''
             # Canonical PDB ATOM/HETATM format string
-            strict_line = ("{:<6}{:>5} {:>4}{:1}{:>3} {:1}{:>4}{:1}   "
+            strict_line = ("{:<6}{:>5} {:4}{:1}{:>3} {:1}{:>4}{:1}   "
                            "{:>8}{:>8}{:>8}{:>6}{:>6}          {:>2}{:>2}\n").format(
                 record, serial, name, altLoc, resName, chainID, resSeq, iCode,
                 x, y, z, occupancy, tempFactor, element, charge)
