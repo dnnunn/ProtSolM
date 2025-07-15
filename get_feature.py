@@ -10,7 +10,17 @@ import logging
 import subprocess
 sys.path.append(os.getcwd())
 
-logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
+# Set up logging
+log_file = 'feature_extraction.log'
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, mode='w'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
 from Bio import PDB
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -105,43 +115,34 @@ def custom_dssp_parser(dssp_file):
     return dssp_dict
 
 def generate_feature(pdb_file):
-    sanitized_pdb_path = None
     try:
         # extract amino acid sequence
         aa_seq = extract_seq_from_pdb(pdb_file)
-        sanitized_pdb_path = sanitize_pdb_for_dssp(pdb_file)
-        is_temp = True
 
-        logging.debug(f"Bypassing Bio.PDB.DSSP, using direct mkdssp call on {sanitized_pdb_path}")
+        logging.debug(f"Using direct mkdssp call on {pdb_file}")
         
         # Primary method: direct subprocess call to mkdssp
-        import tempfile
-        import subprocess
-        # from Bio.PDB.DSSP import make_dssp_dict # Replaced with custom parser
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.dssp', dir='/var/tmp') as dssp_out:
+            dssp_out_name = dssp_out.name
+        
+        command = ['mkdssp', pdb_file, dssp_out_name]
+        result = subprocess.run(command, capture_output=True, text=True)
 
-        tmp_dssp_out = tempfile.NamedTemporaryFile(delete=False, suffix='.dssp')
-        tmp_dssp_out.close()
-        mkdssp_cmd = ['mkdssp', sanitized_pdb_path, tmp_dssp_out.name]
-        logging.debug(f"Running command: {' '.join(mkdssp_cmd)}")
-
-        try:
-            result = subprocess.run(mkdssp_cmd, capture_output=True, text=True, check=True)
-            # Use the robust custom parser instead of BioPython's
-            dssp_dict = custom_dssp_parser(tmp_dssp_out.name)
-            if not dssp_dict:
-                 raise ValueError("DSSP output is empty after parsing.")
-            # If successful, clean up the temp file
-            os.unlink(tmp_dssp_out.name)
-        except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
-            error_msg = f"Direct mkdssp call failed. Sanitized PDB: {sanitized_pdb_path}. DSSP output: {tmp_dssp_out.name}."
-            if isinstance(e, subprocess.CalledProcessError):
-                error_msg += f"\nReturn Code: {e.returncode}\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}"
-            else:
-                error_msg += f"\nException: {e}"
-            return pdb_file, error_msg
-
+        if result.returncode != 0:
+            error_message = f"mkdssp failed for {os.path.basename(pdb_file)} with exit code {result.returncode}. Stderr: {result.stderr.strip()}"
+            logging.error(error_message)
+            os.remove(dssp_out_name)
+            return None, result.stderr.strip()
+        # Use the robust custom parser instead of BioPython's
+        dssp_dict = custom_dssp_parser(dssp_out_name)
+        if not dssp_dict:
+             raise ValueError("DSSP output is empty after parsing.")
+        # If successful, clean up the temp file
+        # Clean up dssp file if it exists
+        if 'dssp_out_name' in locals() and os.path.exists(dssp_out_name):
+            os.remove(dssp_out_name)
         # Process the DSSP and hydrogen bond features
-        traj = md.load(sanitized_pdb_path)
+        traj = md.load(pdb_file)
         hbonds = md.kabsch_sander(traj)
 
         # Sort dictionary by residue index to ensure correct order
@@ -151,11 +152,7 @@ def generate_feature(pdb_file):
         # RSA from custom parser is already a float, no need for dssp_dict[key][2]
         rsa = [dssp_dict[key][2] for key in sorted_keys]
     except Exception as e:
-        return pdb_file, str(e) + ' (file: ' + sanitized_pdb_path + ')'
-    finally:
-        if 'is_temp' in locals() and is_temp:
-            print(f"[DEBUG] Not deleting temp sanitized PDB: {sanitized_pdb_path}")
-            # os.unlink(sanitized_pdb_path)  # Commented out for debugging
+        return pdb_file, str(e)
 
     sec_structure_str_8 = ''.join(sec_structures)
     sec_structure_str_8 = sec_structure_str_8.replace('-', 'L')
@@ -172,7 +169,7 @@ def generate_feature(pdb_file):
     final_feature["rsa"] = rsa
     final_feature["hbonds_num"] = hbonds[0].nnz
     
-    struct = bsio.load_structure(pdb_file, extra_fields=["b_factor"])
+    struct = biotite.structure.io.load_structure(pdb_file, extra_fields=["b_factor"])
     final_feature["pLDDT"] = struct.b_factor.mean()
 
     return final_feature, None
@@ -302,19 +299,16 @@ if __name__ == '__main__':
         # Run the formatting script as a subprocess
         script_path = os.path.join(os.path.dirname(__file__), 'format_pdb.sh')
         if os.path.exists(script_path):
-            print(f"\nRunning PDB formatting script in: {pdb_dir}")
+            logging.info(f"Running PDB formatting script in: {pdb_dir}")
             subprocess.run(['bash', script_path], cwd=pdb_dir, check=True)
             # Update pdb_dir to point to the directory with formatted files
             pdb_dir = os.path.join(pdb_dir, 'pdb_final')
-            print(f"Using formatted PDBs from: {pdb_dir}\n")
+            logging.info(f"Using formatted PDBs from: {pdb_dir}")
         else:
-            print(f"Warning: PDB formatting script not found at {script_path}. Using original PDBs.")
+            logging.warning(f"PDB formatting script not found at {script_path}. Using original PDBs.")
 
         pdb_files = [f for f in os.listdir(pdb_dir) if f.endswith('.pdb')]
-    print("PDB files to process:", pdb_files)
-    for f in pdb_files:
-        full_path = os.path.join(pdb_dir, f)
-        print(f"{f}: isfile={os.path.isfile(full_path)}, size={os.path.getsize(full_path)}")
+    logging.info(f"{len(pdb_files)} PDB files to process.")
     
     if args.sanitize:
         sanitized_path = sanitize_pdb_for_dssp(args.sanitize)
@@ -324,7 +318,7 @@ if __name__ == '__main__':
     def process_pdb(pdb_file, pdb_dir):
         features, error = generate_feature(os.path.join(pdb_dir, pdb_file))
         if error or not isinstance(features, dict):
-            print(f"Skipping {pdb_file}: error={error}, features type={type(features)}")
+            logging.warning(f"Skipping {pdb_file} due to processing error: {error}")
             return None
         properties_seq = properties_from_sequence(features)
         properties_dssp = properties_from_dssp(features)
