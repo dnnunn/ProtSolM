@@ -116,7 +116,7 @@ class GNN_model(nn.Module):
         if "egnn" == self.args.gnn:
             self.GNN_model = EGNN(self.gnn_config, self.args, self.input_dim, self.out_dim)
         else:
-            raise KeyError(f"No implement of {self.opt['gnn']}")
+            raise KeyError(f"No implement of {self.args.gnn}")
         self.GNN_model = self.GNN_model.cuda()
 
     def forward(self, batch_graph):

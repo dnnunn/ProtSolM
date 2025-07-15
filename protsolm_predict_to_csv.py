@@ -71,6 +71,7 @@ def main():
     parser.add_argument('--c_alpha_max_neighbors', type=int, default=32)
     parser.add_argument('--output_csv', required=True, help='Output CSV path for standardized predictions')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--gnn_config', type=str, default='src/config/egnn.yaml', help='Path to GNN config YAML (default matches eval.py)')
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -111,9 +112,9 @@ def main():
     # Load models
     logger.info("***** Load Model *****")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # Patch: set gnn_config to None if not present
-    if not hasattr(args, "gnn_config"):
-        args.gnn_config = None
+    # Restore YAML config loading for full compatibility
+    import yaml
+    args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
     plm_model = PLM_model(args).to(device)
     gnn_model = GNN_model(args).to(device)
     checkpoint = torch.load(args.gnn_model_path)
