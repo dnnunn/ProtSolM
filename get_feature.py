@@ -95,6 +95,42 @@ def sanitize_pdb_for_dssp(pdb_file):
     logging.debug(f"Created sanitized PDB (ground-up): {sanitized_pdb_path}")
     return sanitized_pdb_path
 
+def custom_dssp_parser(dssp_file):
+    """
+    Parses a DSSP output file manually to avoid Bio.PDB parser issues.
+    Returns a dictionary with the same structure as the one from Bio.PDB.DSSP.
+    """
+    dssp_dict = {}
+    with open(dssp_file, 'r') as f:
+        lines = f.readlines()
+
+    start_idx = 0
+    for i, line in enumerate(lines):
+        if "  #  RESIDUE" in line:
+            start_idx = i + 1
+            break
+
+    if start_idx == 0:
+        return dssp_dict
+
+    for line in lines[start_idx:]:
+        if len(line) > 38 and line[13] != '!' and line[13].strip():
+            try:
+                res_num = int(line[5:10].strip())
+                chain_id = line[11].strip() or 'A'
+                aa = line[13]
+                ss = line[16]
+                if ss == ' ': ss = 'C'  # Map blank to Coil
+                rsa = float(line[35:38].strip())
+
+                dict_key = (chain_id, (' ', res_num, ' '))
+                # Value: (amino_acid, sec_structure, rsa, ... other fields ...)
+                # We only need the first 3 for our features.
+                dssp_dict[dict_key] = (aa, ss, rsa)
+            except (ValueError, IndexError):
+                continue
+    return dssp_dict
+
 def generate_feature(pdb_file):
     sanitized_pdb_path = None
     try:
@@ -108,7 +144,7 @@ def generate_feature(pdb_file):
         # Primary method: direct subprocess call to mkdssp
         import tempfile
         import subprocess
-        from Bio.PDB.DSSP import make_dssp_dict
+        # from Bio.PDB.DSSP import make_dssp_dict # Replaced with custom parser
 
         tmp_dssp_out = tempfile.NamedTemporaryFile(delete=False, suffix='.dssp')
         tmp_dssp_out.close()
@@ -117,13 +153,9 @@ def generate_feature(pdb_file):
 
         try:
             result = subprocess.run(mkdssp_cmd, capture_output=True, text=True, check=True)
-            dssp_dict, _ = make_dssp_dict(tmp_dssp_out.name)
-            # Convert dict to list of tuples for compatibility with downstream code
-            dssp = [
-                (k, d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12])
-                for k, d in dssp_dict.items()
-            ]
-            if not dssp:
+            # Use the robust custom parser instead of BioPython's
+            dssp_dict = custom_dssp_parser(tmp_dssp_out.name)
+            if not dssp_dict:
                  raise ValueError("DSSP output is empty after parsing.")
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
             error_msg = f"Direct mkdssp call failed. File: {sanitized_pdb_path}."
@@ -143,6 +175,7 @@ def generate_feature(pdb_file):
         sorted_keys = sorted(dssp_dict.keys(), key=lambda k: k[1][1])
         
         sec_structures = [dssp_dict[key][1] for key in sorted_keys]
+        # RSA from custom parser is already a float, no need for dssp_dict[key][2]
         rsa = [dssp_dict[key][2] for key in sorted_keys]
     except Exception as e:
         return pdb_file, str(e) + ' (file: ' + sanitized_pdb_path + ')'
