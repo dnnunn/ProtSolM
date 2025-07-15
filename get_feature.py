@@ -34,6 +34,11 @@ def sanitize_pdb_for_dssp(pdb_file):
     
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
+
+    # Add CRYST1 record if missing to handle DSSP parsing errors
+    if not any(line.startswith('CRYST1') for line in lines):
+        cryst1_line = "CRYST1   90.000   90.000   90.000  90.00  90.00  90.00 P 1           1          \n"
+        lines.insert(0, cryst1_line)
     
     # Check if CRYST1 record exists; if not, add a default one
     has_cryst1 = any(line.startswith('CRYST1') for line in lines)
