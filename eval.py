@@ -296,8 +296,10 @@ if __name__ == "__main__":
     # multi-thread load data will shuffle the order of data
     # so we need to save the information
     def process_data(name, fd):
-        pdb_name = name + '.pdb'
-        data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{pdb_name}.pt")
+        graph_name = name + '_final'
+        pdb_name = name + '_final.pdb'
+
+        data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{graph_name}.pt")
         data.label = torch.tensor(label_dict[name]).view(1)
         data.aa_seq = seq_dict[name]
         data.name = name
