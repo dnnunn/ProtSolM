@@ -39,18 +39,18 @@ def sanitize_pdb_for_dssp(pdb_file):
     # Insert CRYST1 if missing (use canonical 1CRN values, exact format)
     cryst1_line = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1\n'
 
-    output_lines = []
+    # Always start with HEADER, TITLE, CRYST1
+    output_lines = [header_line, title_line, cryst1_line]
     for line in lines:
-        if line.startswith('HEADER'):
-            header_inserted = True
-        if line.startswith('TITLE'):
-            title_inserted = True
-        if line.startswith('CRYST1'):
-            cryst1_inserted = True
-        import re
+        if line.startswith('HEADER') or line.startswith('TITLE') or line.startswith('CRYST1'):
+            continue
         if line.startswith('ATOM') or line.startswith('HETATM'):
+            # Fix chain ID (column 22, 1-based) if missing or blank
+            line = line.rstrip('\n')
+            if len(line) >= 22 and (line[21] == ' ' or line[21] == ''):
+                line = line[:21] + 'A' + line[22:]
             # Mimic sed: replace double space after atom serial with single space
-            fixed_line = re.sub(r'^(ATOM  .{5})  ', r'\1 ', line.rstrip('\n'))
+            fixed_line = re.sub(r'^(ATOM  .{5})  ', r'\1 ', line)
             # Pad to 80 characters
             output_lines.append(fixed_line[:80].ljust(80) + "\n")
         else:
