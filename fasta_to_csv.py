@@ -18,8 +18,9 @@ def fasta_to_csv(fasta_file, csv_file):
         sequence = str(record.seq)
         
         proteins.append({
-            'protein_name': protein_id,
-            'sequence': sequence
+            'id': protein_id,
+            'aa_seq': sequence,
+            'label': 0  # Placeholder for evaluation
         })
     
     # Create DataFrame and save to CSV
