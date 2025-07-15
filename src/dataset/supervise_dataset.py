@@ -192,11 +192,14 @@ class SuperviseDataset(Dataset):
         self.total_protein_names = sorted(os.listdir(self.pdb_path))
         process_bar = tqdm(self.total_protein_names)
         for name in process_bar:
+            pdb_file = os.path.join(self.pdb_path, name)
+            if not os.path.isfile(pdb_file):
+                continue
+
             if os.path.exists(os.path.join(self.saved_graph_path, name.split('.')[0] + '.pt')):
                 continue
             
             process_bar.set_description(f"Processing {name}")
-            pdb_file = os.path.join(self.pdb_path, name)
             rec, rec_coords, c_alpha_coords, n_coords, c_coords,seq = self.get_receptor_inference(pdb_file)
 
             rec_graph = self.get_calpha_graph(rec, c_alpha_coords, n_coords, c_coords,seq)
