@@ -178,25 +178,34 @@ feature_dict ={}
 if __name__ == "__main__":
     args = create_parser()
 
-    # === FIX: Calculate feature_dim directly from the feature file ===
-    if args.feature_file:
-        feature_df = pd.read_csv(args.feature_file)
-        # Subtract the 'protein name' column to get the number of features
-        args.feature_dim = len(feature_df.columns) - 1
-    # ===============================================================
-
     args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
     args.gnn_config["hidden_channels"] = args.gnn_hidden_dim
-    
+
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+
     if args.feature_file:
         logger.info("***** Loading Feature *****")
-        feature_df = pd.read_csv(args.feature_file)
+        # === DEFINITIVE FIX START ===
+        # Load features and set the protein name as the index for easy lookup.
+        feature_df = pd.read_csv(args.feature_file).set_index('protein name')
+
+        # Drop the 'L' column as it is not a feature for the model.
+        if 'L' in feature_df.columns:
+            feature_df = feature_df.drop('L', axis=1)
+
+        # The remaining columns are our features.
+        feature_columns = feature_df.columns
+        args.feature_dim = len(feature_columns)
+        logger.info(f"Correctly calculated feature dimension: {args.feature_dim}")
+
+        # Create the feature dictionary for the model.
+        for protein_name, row in tqdm(feature_df.iterrows()):
+            feature_dict[protein_name] = row.values.astype(np.float32)
+        # === DEFINITIVE FIX END ===
+
         if type(args.feature_name) != list:
             args.feature_name = [args.feature_name]
-        
 
         feature_aa_composition = ["1-C", "1-D", "1-E", "1-R", "1-H", "Turn-forming residues fraction"]
         if "aa_composition" in args.feature_name:
