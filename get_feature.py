@@ -63,7 +63,8 @@ def sanitize_pdb_for_dssp(pdb_file):
             element = line[76:78].rjust(2)
             # Compose strict line
             strict_line = f"{record}{serial} {name}{altLoc}{resName} {chainID}{resSeq}{iCode}   {x}{y}{z}{occupancy}{tempFactor}          {element}\n"
-            output_lines.append(strict_line)
+            # Pad to 80 characters
+            output_lines.append(strict_line.rstrip().ljust(80) + "\n")
         else:
             output_lines.append(line)
 
