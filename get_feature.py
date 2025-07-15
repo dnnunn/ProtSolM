@@ -44,13 +44,13 @@ def sanitize_pdb_for_dssp(pdb_file):
     output_lines.append(cryst1.ljust(80) + '\n')
 
     last_atom_line_info = None
-    atom_serial = 0
+    atom_serial_counter = 0
 
     # 2. Process only ATOM/HETATM records from the original file
     with open(pdb_file, 'r') as f:
         for line in f:
             if line.startswith('ATOM') or line.startswith('HETATM'):
-                atom_serial += 1
+                atom_serial_counter += 1
                 # Ensure chain ID in column 22 is 'A' if blank
                 if len(line) >= 22 and line[21] == ' ':
                     line = line[:21] + 'A' + line[22:]
@@ -80,7 +80,7 @@ def sanitize_pdb_for_dssp(pdb_file):
         ter_res_name = last_atom_line_info['resName']
         ter_chain_id = last_atom_line_info['chainID']
         ter_res_seq = last_atom_line_info['resSeq']
-        ter_serial = atom_serial + 1
+        ter_serial = atom_serial_counter + 1
         ter_record = f'TER   {ter_serial:>5}      {ter_res_name:>3} {ter_chain_id}{ter_res_seq:>4}'
         output_lines.append(ter_record.ljust(80) + '\n')
 
@@ -96,6 +96,7 @@ def sanitize_pdb_for_dssp(pdb_file):
     return sanitized_pdb_path
 
 def generate_feature(pdb_file):
+    sanitized_pdb_path = None
     try:
         # extract amino acid sequence
         aa_seq = extract_seq_from_pdb(pdb_file)
