@@ -188,7 +188,7 @@ class SuperviseDataset(Dataset):
             torch.save(graph_data, saved_prcessed_name)
 
     def generate_protein_graph_evaluation(self):
-        self.total_protein_names = sorted(os.listdir(self.raw_dir))
+        self.total_protein_names = sorted(os.listdir(self.pdb_path))
         process_bar = tqdm(self.total_protein_names)
         for name in process_bar:
             if os.path.exists(os.path.join(self.saved_graph_path, name + '.pt')):
