@@ -307,7 +307,7 @@ if __name__ == "__main__":
             data.feature = torch.from_numpy(feature_dict[pdb_name]).float()
         else:
             logger.info(f"No features found for '{pdb_name}', using default zeros")
-            data.feature = torch.zeros(len(data.aa_seq), args.feature_dim)
+            data.feature = torch.zeros(1, args.feature_dim)
         return data
     
     def collect_fn(batch):
