@@ -90,9 +90,9 @@ def main():
     # Load test set
     logger.info("***** Loading Dataset *****")
     test_df = pd.read_csv(args.test_file)
-    test_names = test_df['name'].tolist()
-    label_dict = dict(zip(test_df['name'], test_df['label']))
-    seq_dict = dict(zip(test_df['name'], test_df['aa_seq']))
+    test_names = test_df['id'].tolist()
+    label_dict = dict(zip(test_df['id'], test_df['label']))
+    seq_dict = dict(zip(test_df['id'], test_df['aa_seq']))
     graph_dir = 'esmfold_pdb' if os.path.exists(f"{args.supv_dataset}/esmfold_pdb") else 'esmfold_pdb'
     test_node_nums = [1 for _ in test_names]  # Placeholder: update if needed
 
@@ -137,14 +137,14 @@ def main():
 
     # Run prediction
     logger.info("***** Running prediction *****")
-    result_dict = {"name": [], "aa_seq": [], "label": [], "pred_label": [], "probability": []}
+    result_dict = {"id": [], "aa_seq": [], "label": [], "pred_label": [], "probability": []}
     with torch.no_grad():
         for batch in tqdm(test_dataloader, total=len(test_dataloader)):
             logits, _ = protssn_classification(plm_model, gnn_model, batch, True)
             logits = logits.cuda()
             probs = torch.softmax(logits, dim=1)[:, 1].detach().cpu().numpy()
             pred_labels = torch.argmax(logits, 1).cpu().numpy()
-            result_dict["name"].extend([data.name for data in batch])
+            result_dict["id"].extend([data.name for data in batch])
             result_dict["aa_seq"].extend([data.aa_seq for data in batch])
             result_dict["label"].extend([data.label.item() for data in batch])
             result_dict["pred_label"].extend(pred_labels.tolist())
@@ -152,7 +152,7 @@ def main():
 
     # Save standardized CSV
     df = pd.DataFrame({
-        "id": result_dict["name"],
+        "id": result_dict["id"],
         "sequence": result_dict["aa_seq"],
         "label": result_dict["label"],
         "pred_label": result_dict["pred_label"],
