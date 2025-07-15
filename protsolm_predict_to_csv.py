@@ -72,6 +72,7 @@ def main():
     parser.add_argument('--output_csv', required=True, help='Output CSV path for standardized predictions')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--gnn_config', type=str, default='src/config/egnn.yaml', help='Path to GNN config YAML (default matches eval.py)')
+    parser.add_argument('--feature_embed_dim', type=int, default=None, help='Feature embedding dimension (default: None, matches eval.py)')
     args = parser.parse_args()
 
     set_seed(args.seed)
