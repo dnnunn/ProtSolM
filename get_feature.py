@@ -46,25 +46,28 @@ def sanitize_pdb_for_dssp(pdb_file):
         if line.startswith('CRYST1'):
             cryst1_inserted = True
         if line.startswith('ATOM') or line.startswith('HETATM'):
-            # Strict PDB ATOM/HETATM formatting
-            record = line[0:6].ljust(6)
-            serial = line[6:11].rjust(5)
-            name = line[12:16].ljust(4)
-            altLoc = line[16:17]
-            resName = line[17:20].rjust(3)
-            chainID = line[21:22]
-            resSeq = line[22:26].rjust(4)
-            iCode = line[26:27]
-            x = line[30:38].rjust(8)
-            y = line[38:46].rjust(8)
-            z = line[46:54].rjust(8)
-            occupancy = line[54:60].rjust(6)
-            tempFactor = line[60:66].rjust(6)
-            element = line[76:78].rjust(2)
-            # Compose strict line
-            strict_line = f"{record}{serial} {name}{altLoc}{resName} {chainID}{resSeq}{iCode}   {x}{y}{z}{occupancy}{tempFactor}          {element}\n"
-            # Pad to 80 characters
-            output_lines.append(strict_line.rstrip().ljust(80) + "\n")
+            # Parse fields according to PDB format columns (1-indexed)
+            record = line[0:6].strip()
+            serial = line[6:11].strip()
+            name = line[12:16].strip()
+            altLoc = line[16:17].strip()
+            resName = line[17:20].strip()
+            chainID = line[21:22].strip()
+            resSeq = line[22:26].strip()
+            iCode = line[26:27].strip()
+            x = line[30:38].strip()
+            y = line[38:46].strip()
+            z = line[46:54].strip()
+            occupancy = line[54:60].strip()
+            tempFactor = line[60:66].strip()
+            element = line[76:78].strip()
+            charge = line[78:80].strip() if len(line) >= 80 else ''
+            # Canonical PDB ATOM/HETATM format string
+            strict_line = ("{:<6}{:>5} {:>4}{:1}{:>3} {:1}{:>4}{:1}   "
+                           "{:>8}{:>8}{:>8}{:>6}{:>6}          {:>2}{:>2}\n").format(
+                record, serial, name, altLoc, resName, chainID, resSeq, iCode,
+                x, y, z, occupancy, tempFactor, element, charge)
+            output_lines.append(strict_line)
         else:
             output_lines.append(line)
 
