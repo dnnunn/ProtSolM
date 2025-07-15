@@ -1,6 +1,11 @@
 import argparse
 import yaml
 import os
+import sys
+
+# Add project root to the Python path to resolve module import errors
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 from src.dataset.supervise_dataset import SuperviseDataset
 from src.utils.common import set_seed
 import logging
