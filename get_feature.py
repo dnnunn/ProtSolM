@@ -50,7 +50,11 @@ def sanitize_pdb_for_dssp(pdb_file):
                     # PDB format is fixed-width. Parse fields by slicing.
                     record_type = line[0:6]   # e.g., 'ATOM  '
                     atom_serial = int(line[6:11])
-                    atom_name = line[12:16] # e.g., ' CA '
+                    atom_name_raw = line[12:16].strip()
+                    if len(atom_name_raw) == 1:
+                        atom_name = f' {atom_name_raw}  '
+                    else:
+                        atom_name = f' {atom_name_raw:<3}'
                     alt_loc = line[16:17]
                     res_name = line[17:20]
                     chain_id = line[21:22].strip() or 'A' # Default to 'A'
