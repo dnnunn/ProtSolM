@@ -27,15 +27,11 @@ ss_alphabet_dic = {
 def sanitize_pdb_for_dssp(pdb_file):
     """
     Builds a clean PDB file from scratch to ensure DSSP compatibility.
-
-    This function reads an input PDB, writes canonical HEADER, TITLE, and CRYST1
-    records, then processes and appends only ATOM/HETATM records, ensuring they
-    are correctly formatted. It finishes by adding TER and END records.
-    This ground-up approach is more robust than patching existing lines.
+    This version strictly adheres to the PDB format specification to fix alignment issues.
     """
     output_lines = []
 
-    # 1. Add canonical HEADER, TITLE, and CRYST1 records (80 chars)
+    # 1. Add canonical HEADER, TITLE, and CRYST1 records
     header = 'HEADER    PEPTIDE PROJECT PDB                01-JAN-00   XXXX'
     title = f'TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}'
     cryst1 = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1'
@@ -43,7 +39,6 @@ def sanitize_pdb_for_dssp(pdb_file):
     output_lines.append(title.ljust(80) + '\n')
     output_lines.append(cryst1.ljust(80) + '\n')
 
-    last_atom_line_info = None
     atom_serial_counter = 0
 
     # 2. Process only ATOM/HETATM records from the original file
@@ -51,32 +46,45 @@ def sanitize_pdb_for_dssp(pdb_file):
         for line in f:
             if line.startswith('ATOM') or line.startswith('HETATM'):
                 atom_serial_counter += 1
-                # Ensure chain ID in column 22 is 'A' if blank
-                if len(line) >= 22 and line[21] == ' ':
-                    line = line[:21] + 'A' + line[22:]
+                try:
+                    # PDB format is fixed-width. Parse fields by slicing.
+                    record_type = line[0:6]   # e.g., 'ATOM  '
+                    atom_serial = int(line[6:11])
+                    atom_name = line[12:16] # e.g., ' CA '
+                    alt_loc = line[16:17]
+                    res_name = line[17:20]
+                    chain_id = line[21:22].strip() or 'A' # Default to 'A'
+                    res_seq = int(line[22:26])
+                    icode = line[26:27]
+                    x = float(line[30:38])
+                    y = float(line[38:46])
+                    z = float(line[46:54])
+                    occupancy = float(line[54:60])
+                    temp_factor = float(line[60:66])
+                    element = line[76:78].strip()
 
-                # The most robust fix: use string slicing for the fixed-width PDB format.
-                # This avoids all regex complexities and guarantees correct spacing.
-                record_type = line[0:6]
-                atom_serial = line[6:11]
-                space1 = ' '
-                atom_name = line[12:16].strip()
-                rest_of_line = line[16:]
+                    # Reconstruct the line with perfect formatting.
+                    # f-strings with alignment specifiers are perfect for this.
+                    fixed_line = (
+                        f"{record_type:<6}{atom_serial:>5} {atom_name:<4}{alt_loc:1}"
+                        f"{res_name:>3} {chain_id:1}{res_seq:>4}{icode:1}   "
+                        f"{x:8.3f}{y:8.3f}{z:8.3f}{occupancy:6.2f}{temp_factor:6.2f}          "
+                        f"{element:>2}"
+                    )
+                    output_lines.append(fixed_line.ljust(80) + '\n')
 
-                # Reconstruct the line with guaranteed correct PDB formatting
-                fixed_line = f"{record_type}{atom_serial}{space1}{atom_name.ljust(4)}{rest_of_line}".rstrip() 
-
-                output_lines.append(fixed_line.ljust(80) + '\n')
-                
-                # Store info from the last atom for the TER record
-                last_atom_line_info = {
-                    'resName': line[17:20].strip(),
-                    'chainID': line[21:22].strip() if line[21:22].strip() else 'A',
-                    'resSeq': line[22:26].strip()
-                }
+                    # Store info for TER record
+                    last_atom_line_info = {
+                        'resName': res_name,
+                        'chainID': chain_id,
+                        'resSeq': res_seq
+                    }
+                except (ValueError, IndexError):
+                    # Skip malformed ATOM/HETATM lines
+                    continue
 
     # 3. Add a canonical TER record
-    if last_atom_line_info:
+    if 'last_atom_line_info' in locals():
         ter_res_name = last_atom_line_info['resName']
         ter_chain_id = last_atom_line_info['chainID']
         ter_res_seq = last_atom_line_info['resSeq']
