@@ -32,8 +32,10 @@ def sanitize_pdb_for_dssp(pdb_file):
     header_inserted = False
     title_inserted = False
     cryst1_inserted = False
-    header_line = f"HEADER    Peptide Project PDB\n"
-    title_line = f"TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}\n"
+    # Canonical HEADER: columns 11-50 = classification, 51-59 = date, 63-66 = PDB ID
+    # Example: HEADER    PEPTIDE PROJECT PDB                01-JAN-00   XXXX
+    header_line = ("HEADER    PEPTIDE PROJECT PDB".ljust(50) + "01-JAN-00".rjust(9) + "   XXXX".rjust(11) + "\n")
+    title_line = (f"TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}".ljust(80) + "\n")
     # Insert CRYST1 if missing (use canonical 1CRN values, exact format)
     cryst1_line = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1\n'
 
@@ -69,7 +71,15 @@ def sanitize_pdb_for_dssp(pdb_file):
                 x, y, z, occupancy, tempFactor, element, charge)
             output_lines.append(strict_line)
         else:
-            output_lines.append(line)
+            # Pad END lines to 80 characters
+            if line.startswith('END'):
+                output_lines.append(line.rstrip().ljust(80) + "\n")
+            # Pad TITLE lines to 80 characters
+            elif line.startswith('TITLE'):
+                output_lines.append(line.rstrip().ljust(80) + "\n")
+            else:
+                output_lines.append(line)
+
 
     insert_idx = 0
     if not header_inserted:
