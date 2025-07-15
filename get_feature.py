@@ -7,6 +7,7 @@ import biotite.structure.io as bsio
 import re
 import tempfile
 import logging
+import subprocess
 sys.path.append(os.getcwd())
 
 logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
@@ -297,9 +298,19 @@ if __name__ == '__main__':
         pdb_files = [os.path.basename(args.pdb_file)]
         pdb_dir = os.path.dirname(args.pdb_file) or '.'
     else:
-        all_entries = os.listdir(args.pdb_dir)
-        pdb_files = [f for f in all_entries if os.path.isfile(os.path.join(args.pdb_dir, f)) and f.endswith('.pdb')]
         pdb_dir = args.pdb_dir
+        # Run the formatting script as a subprocess
+        script_path = os.path.join(os.path.dirname(__file__), 'format_pdb.sh')
+        if os.path.exists(script_path):
+            print(f"\nRunning PDB formatting script in: {pdb_dir}")
+            subprocess.run(['bash', script_path], cwd=pdb_dir, check=True)
+            # Update pdb_dir to point to the directory with formatted files
+            pdb_dir = os.path.join(pdb_dir, 'pdb_final')
+            print(f"Using formatted PDBs from: {pdb_dir}\n")
+        else:
+            print(f"Warning: PDB formatting script not found at {script_path}. Using original PDBs.")
+
+        pdb_files = [f for f in os.listdir(pdb_dir) if f.endswith('.pdb')]
     print("PDB files to process:", pdb_files)
     for f in pdb_files:
         full_path = os.path.join(pdb_dir, f)
