@@ -126,7 +126,9 @@ def generate_feature(pdb_file):
         result = subprocess.run(command, capture_output=True, text=True)
 
         if result.returncode != 0:
-            error_message = f"mkdssp failed for {os.path.basename(pdb_file)} with exit code {result.returncode}. Stderr: {result.stderr.strip()}"
+            base_name = os.path.basename(pdb_file)
+            name = base_name.replace('_final.pdb', '')
+            error_message = f"mkdssp failed for {name} with exit code {result.returncode}. Stderr: {result.stderr.strip()}"
             logging.error(error_message)
             os.remove(dssp_out_name)
             return None, result.stderr.strip()
@@ -159,7 +161,8 @@ def generate_feature(pdb_file):
     sec_structure_str_3 = ''.join([ss_alphabet_dic.get(ss, 'C') for ss in sec_structures])
 
     final_feature = {}
-    final_feature["name"] = pdb_file.split('/')[-1]
+    base_name = pdb_file.split('/')[-1]
+    final_feature["name"] = base_name.replace('_final.pdb', '')
     final_feature["aa_seq"] = aa_seq
     final_feature["ss8_seq"] = sec_structure_str_8
     final_feature["ss3_seq"] = sec_structure_str_3
