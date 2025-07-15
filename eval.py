@@ -247,7 +247,7 @@ if __name__ == "__main__":
         
         
         for i in tqdm(range(len(feature_df))):
-            name = feature_df["protein name"][i].split(".")[0]
+            name = feature_df.index[i].split(".")[0]
             feature_dict[name] = []
             if "aa_composition" in args.feature_name:
                 feature_dict[name] += list(aa_composition_df.iloc[i])
