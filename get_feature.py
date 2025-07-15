@@ -35,24 +35,40 @@ def sanitize_pdb_for_dssp(pdb_file):
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
 
+    # Find if there is a TER record to handle chains properly
+    has_ter_record = any(line.startswith('TER') for line in lines)
+
     for line in lines:
-        if line.startswith('ATOM') or line.startswith('HETATM'):
+        if line.startswith(('ATOM', 'HETATM')):
             # Re-number the atom serial in place.
-            original_serial = line[6:11]
             new_serial = str(atom_counter).rjust(5)
-            line = line[:6] + new_serial + line[11:]
-            sanitized_lines.append(line)
+            modified_line = line[:6] + new_serial + line[11:]
+            sanitized_lines.append(modified_line)
             atom_counter += 1
         elif line.startswith('TER'):
             # Re-number TER card as well if it exists.
-            original_serial = line[6:11]
             new_serial = str(atom_counter).rjust(5)
-            line = line[:6] + new_serial + line[11:]
-            sanitized_lines.append(line)
+            modified_line = line[:6] + new_serial + line[11:]
+            sanitized_lines.append(modified_line)
             atom_counter += 1
         else:
             # Keep other lines like HEADER, CRYST1, END as is.
             sanitized_lines.append(line)
+
+    # If there was no TER record, we should add one before the END.
+    if not has_ter_record:
+        # Find the index of END record, if it exists
+        end_index = -1
+        for i, line in enumerate(sanitized_lines):
+            if line.startswith('END'):
+                end_index = i
+                break
+        # Insert TER before END, or at the end of the file.
+        ter_line = 'TER\n'
+        if end_index != -1:
+            sanitized_lines.insert(end_index, ter_line)
+        else:
+            sanitized_lines.append(ter_line)
 
     # Ensure there's an END record if one doesn't exist
     if not any(line.startswith('END') for line in sanitized_lines):
@@ -61,7 +77,7 @@ def sanitize_pdb_for_dssp(pdb_file):
     temp_pdb = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pdb', dir='/var/tmp')
     temp_pdb.writelines(sanitized_lines)
     temp_pdb.close()
-    logging.debug(f"Created sanitized PDB (minimal touch): {temp_pdb.name}")
+    logging.debug(f"Created sanitized PDB (preserve-header): {temp_pdb.name}")
     return temp_pdb.name
 
 
