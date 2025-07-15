@@ -78,7 +78,8 @@ def sanitize_pdb_for_dssp(pdb_file):
                     output_lines.append(fixed_line.ljust(80) + '\n')
 
                     # Store info for TER record
-                    last_atom_line_info = {
+                    last_atom_info = {
+                        'serial': atom_serial,
                         'resName': res_name,
                         'chainID': chain_id,
                         'resSeq': res_seq
@@ -88,11 +89,11 @@ def sanitize_pdb_for_dssp(pdb_file):
                     continue
 
     # 3. Add a canonical TER record
-    if 'last_atom_line_info' in locals():
-        ter_res_name = last_atom_line_info['resName']
-        ter_chain_id = last_atom_line_info['chainID']
-        ter_res_seq = last_atom_line_info['resSeq']
-        ter_serial = atom_serial_counter + 1
+    if 'last_atom_info' in locals():
+        ter_serial = last_atom_info['serial'] + 1
+        ter_res_name = last_atom_info['resName']
+        ter_chain_id = last_atom_info['chainID']
+        ter_res_seq = last_atom_info['resSeq']
         ter_record = f'TER   {ter_serial:>5}      {ter_res_name:>3} {ter_chain_id}{ter_res_seq:>4}'
         output_lines.append(ter_record.ljust(80) + '\n')
 
