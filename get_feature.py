@@ -29,37 +29,6 @@ def sanitize_pdb_for_dssp(pdb_file):
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
     # Build unique header/title
-    pdb_base = os.path.basename(pdb_file)
-    pdb_name = os.path.splitext(pdb_base)[0]
-    header_line = f'HEADER    Peptide Project PDB\n'
-    title_line = f'TITLE     {pdb_name}\n'
-    # Correctly formatted CRYST1 line (columns: 7-15, 16-24, 25-33, 34-40, 41-47, 48-54, 56-66, 67-70, 71-76)
-    cryst1_line = 'CRYST1{:>9}{:>9}{:>9}{:>7}{:>7}{:>7} {:<10}{:>4}{:>6}\n'.format(
-        '1.000', '1.000', '1.000', '90.00', '90.00', '90.00', 'P 1', '1', ''
-    )
-    # Check for HEADER, TITLE, CRYST1
-    has_header = any(l.startswith('HEADER') for l in lines)
-    has_title = any(l.startswith('TITLE') for l in lines)
-    has_cryst1 = any(l.startswith('CRYST1') for l in lines)
-    # Compose new lines: always HEADER, TITLE, CRYST1 at top if missing
-    needs_patch = not (has_header and has_title and has_cryst1)
-    if needs_patch:
-        new_lines = []
-        if not has_header:
-            new_lines.append(header_line)
-        if not has_title:
-            new_lines.append(title_line)
-        if not has_cryst1:
-            new_lines.append(cryst1_line)
-        # Add the rest, skipping any existing HEADER, TITLE, CRYST1
-        for l in lines:
-            if l.startswith('HEADER') or l.startswith('TITLE') or l.startswith('CRYST1'):
-                continue
-            new_lines.append(l)
-        tmp = tempfile.NamedTemporaryFile('w', delete=False, suffix='.pdb')
-        tmp.writelines(new_lines)
-        tmp.close()
-        return tmp.name, True
     return pdb_file, False
 
 def generate_feature(pdb_file):
