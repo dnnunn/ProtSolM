@@ -211,3 +211,5 @@ basic_filebuf::underflow
 # Custom datasets not tracked in git
 custom_dataset/
 
+Tan et al. - 2024 - PROTSOLM Protein Solubility Prediction with Multi-modal Features.pdf
+Tan2024_ProtSolM.txt
