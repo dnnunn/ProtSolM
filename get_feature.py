@@ -4,6 +4,7 @@ import argparse
 import mdtraj as md
 import pandas as pd
 import biotite.structure.io as bsio
+import re
 sys.path.append(os.getcwd())
 from Bio import PDB
 from tqdm import tqdm
