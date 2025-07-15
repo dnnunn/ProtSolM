@@ -111,40 +111,55 @@ def main():
         else:
             args.feature_name = [args.feature_name]
     # Prepare feature sub-frames if needed
-    if "aa_composition" in args.feature_name:
-        aa_composition_df = feature_df[feature_aa_composition]
-        args.feature_dim += len(feature_aa_composition)
-    if "gravy" in args.feature_name:
-        gravy_df = feature_df[feature_gravy]
-        args.feature_dim += len(feature_gravy)
-    if "ss_composition" in args.feature_name:
-        ss_composition_df = feature_df[feature_ss_composition]
-        args.feature_dim += len(feature_ss_composition)
-    if "hygrogen_bonds" in args.feature_name:
-        hygrogen_bonds_df = feature_df[feature_hygrogen_bonds]
-        args.feature_dim += len(feature_hygrogen_bonds)
-    if "exposed_res_fraction" in args.feature_name:
-        exposed_res_fraction_df = feature_df[feature_exposed_res_fraction]
-        args.feature_dim += len(feature_exposed_res_fraction)
-    if "pLDDT" in args.feature_name:
-        plddt_df = feature_df[feature_pLDDT]
-        args.feature_dim += len(feature_pLDDT)
-    # Build feature_dict per protein
+    feature_dict = {}
     for i in range(len(feature_df)):
         name = feature_df.index[i].split(".")[0]
         feature_dict[name] = []
-        if "aa_composition" in args.feature_name:
-            feature_dict[name] += list(aa_composition_df.iloc[i])
-        if "gravy" in args.feature_name:
-            feature_dict[name] += list(gravy_df.iloc[i])
-        if "ss_composition" in args.feature_name:
-            feature_dict[name] += list(ss_composition_df.iloc[i])
-        if "hygrogen_bonds" in args.feature_name:
-            feature_dict[name] += list(hygrogen_bonds_df.iloc[i])
-        if "exposed_res_fraction" in args.feature_name:
-            feature_dict[name] += list(exposed_res_fraction_df.iloc[i])
-        if "pLDDT" in args.feature_name:
-            feature_dict[name] += list(plddt_df.iloc[i])
+        for feature_set in args.feature_name:
+            if feature_set.lower() == "aa_composition":
+                feature_cols = [col for col in feature_aa_composition if col in feature_df.columns]
+                if not feature_cols:
+                    logger.warning(f"No columns found for feature set 'aa_composition' in feature file. Skipping...")
+                    continue
+                feature_dict[name] += list(feature_df[feature_cols].iloc[i])
+                args.feature_dim += len(feature_cols)
+            elif feature_set.lower() == "gravy":
+                feature_cols = [col for col in feature_gravy if col in feature_df.columns]
+                if not feature_cols:
+                    logger.warning(f"No columns found for feature set 'gravy' in feature file. Skipping...")
+                    continue
+                feature_dict[name] += list(feature_df[feature_cols].iloc[i])
+                args.feature_dim += len(feature_cols)
+            elif feature_set.lower() == "ss_composition":
+                feature_cols = [col for col in feature_ss_composition if col in feature_df.columns]
+                if not feature_cols:
+                    logger.warning(f"No columns found for feature set 'ss_composition' in feature file. Skipping...")
+                    continue
+                feature_dict[name] += list(feature_df[feature_cols].iloc[i])
+                args.feature_dim += len(feature_cols)
+            elif feature_set.lower() == "hygrogen_bonds":
+                feature_cols = [col for col in feature_hygrogen_bonds if col in feature_df.columns]
+                if not feature_cols:
+                    logger.warning(f"No columns found for feature set 'hygrogen_bonds' in feature file. Skipping...")
+                    continue
+                feature_dict[name] += list(feature_df[feature_cols].iloc[i])
+                args.feature_dim += len(feature_cols)
+            elif feature_set.lower() == "exposed_res_fraction":
+                feature_cols = [col for col in feature_exposed_res_fraction if col in feature_df.columns]
+                if not feature_cols:
+                    logger.warning(f"No columns found for feature set 'exposed_res_fraction' in feature file. Skipping...")
+                    continue
+                feature_dict[name] += list(feature_df[feature_cols].iloc[i])
+                args.feature_dim += len(feature_cols)
+            elif feature_set.lower() == "plddt":
+                feature_cols = [col for col in feature_pLDDT if col in feature_df.columns]
+                if not feature_cols:
+                    logger.warning(f"No columns found for feature set 'pLDDT' in feature file. Skipping...")
+                    continue
+                feature_dict[name] += list(feature_df[feature_cols].iloc[i])
+                args.feature_dim += len(feature_cols)
+            else:
+                logger.warning(f"Unknown feature set '{feature_set}' in feature_name. Skipping...")
     # If no feature_name matches, fallback to all columns (legacy biotite)
     if args.feature_dim == 0:
         feature_columns = feature_df.columns
