@@ -26,87 +26,44 @@ ss_alphabet_dic = {
 
 def sanitize_pdb_for_dssp(pdb_file):
     """
-    Builds a clean PDB file from scratch to ensure DSSP compatibility.
-    This version strictly adheres to the PDB format specification to fix alignment issues.
+    Sanitizes a PDB file for DSSP by ensuring atom serial numbers are sequential.
+    This is a minimal-touch approach that preserves original formatting.
     """
-    output_lines = []
-
-    # 1. Add canonical HEADER, TITLE, and CRYST1 records
-    header = 'HEADER    PEPTIDE PROJECT PDB                01-JAN-00   XXXX'
-    title = f'TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}'
-    cryst1 = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1'
-    output_lines.append(header.ljust(80) + '\n')
-    output_lines.append(title.ljust(80) + '\n')
-    output_lines.append(cryst1.ljust(80) + '\n')
-
-    atom_serial_counter = 0
-
-    # 2. Process only ATOM/HETATM records from the original file
-    with open(pdb_file, 'r') as f:
-        for line in f:
-            if line.startswith('ATOM') or line.startswith('HETATM'):
-                atom_serial_counter += 1
-                try:
-                    # PDB format is fixed-width. Parse fields by slicing.
-                    record_type = line[0:6]   # e.g., 'ATOM  '
-                    atom_serial = int(line[6:11])
-                    atom_name_raw = line[12:16].strip()
-                    if len(atom_name_raw) == 1:
-                        atom_name = f' {atom_name_raw}  '
-                    else:
-                        atom_name = f' {atom_name_raw:<3}'
-                    alt_loc = line[16:17]
-                    res_name = line[17:20]
-                    chain_id = line[21:22].strip() or 'A' # Default to 'A'
-                    res_seq = int(line[22:26])
-                    icode = line[26:27]
-                    x = float(line[30:38])
-                    y = float(line[38:46])
-                    z = float(line[46:54])
-                    occupancy = float(line[54:60])
-                    temp_factor = float(line[60:66])
-                    element = line[76:78].strip()
-
-                    # Reconstruct the line with perfect formatting.
-                    # f-strings with alignment specifiers are perfect for this.
-                    fixed_line = (
-                        f"{record_type:<6}{atom_serial:>5} {atom_name:<4}{alt_loc:1}"
-                        f"{res_name:>3} {chain_id:1}{res_seq:>4}{icode:1}   "
-                        f"{x:8.3f}{y:8.3f}{z:8.3f}{occupancy:6.2f}{temp_factor:6.2f}          "
-                        f"{element:>2}"
-                    )
-                    output_lines.append(fixed_line.ljust(80) + '\n')
-
-                    # Store info for TER record
-                    last_atom_info = {
-                        'serial': atom_serial,
-                        'resName': res_name,
-                        'chainID': chain_id,
-                        'resSeq': res_seq
-                    }
-                except (ValueError, IndexError):
-                    # Skip malformed ATOM/HETATM lines
-                    continue
-
-    # 3. Add a canonical TER record
-    if 'last_atom_info' in locals():
-        ter_serial = last_atom_info['serial'] + 1
-        ter_res_name = last_atom_info['resName']
-        ter_chain_id = last_atom_info['chainID']
-        ter_res_seq = last_atom_info['resSeq']
-        ter_record = f'TER   {ter_serial:>5}      {ter_res_name:>3} {ter_chain_id}{ter_res_seq:>4}'
-        output_lines.append(ter_record.ljust(80) + '\n')
-
-    # 4. Add a canonical END record
-    output_lines.append('END'.ljust(80) + '\n')
-
-    # 5. Write to a temporary file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pdb', dir='/var/tmp') as tmp_file:
-        tmp_file.writelines(output_lines)
-        sanitized_pdb_path = tmp_file.name
+    sanitized_lines = []
+    atom_counter = 1
     
-    logging.debug(f"Created sanitized PDB (ground-up): {sanitized_pdb_path}")
-    return sanitized_pdb_path
+    with open(pdb_file, 'r') as f:
+        lines = f.readlines()
+
+    for line in lines:
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+            # Re-number the atom serial in place.
+            original_serial = line[6:11]
+            new_serial = str(atom_counter).rjust(5)
+            line = line[:6] + new_serial + line[11:]
+            sanitized_lines.append(line)
+            atom_counter += 1
+        elif line.startswith('TER'):
+            # Re-number TER card as well if it exists.
+            original_serial = line[6:11]
+            new_serial = str(atom_counter).rjust(5)
+            line = line[:6] + new_serial + line[11:]
+            sanitized_lines.append(line)
+            atom_counter += 1
+        else:
+            # Keep other lines like HEADER, CRYST1, END as is.
+            sanitized_lines.append(line)
+
+    # Ensure there's an END record if one doesn't exist
+    if not any(line.startswith('END') for line in sanitized_lines):
+        sanitized_lines.append('END\n')
+
+    temp_pdb = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pdb', dir='/var/tmp')
+    temp_pdb.writelines(sanitized_lines)
+    temp_pdb.close()
+    logging.debug(f"Created sanitized PDB (minimal touch): {temp_pdb.name}")
+    return temp_pdb.name
+
 
 def custom_dssp_parser(dssp_file):
     """
