@@ -285,6 +285,7 @@ if __name__ == '__main__':
     parser.add_argument('--pdb_dir', type=str)
     parser.add_argument('--num_workers', type=int, default=12)
     parser.add_argument('--out_file', type=str)
+    parser.add_argument('--sanitize', type=str, help='Path to PDB file to sanitize for DSSP compatibility')
     args = parser.parse_args()
     
     out_dir = os.path.dirname(args.out_file)
@@ -304,6 +305,11 @@ if __name__ == '__main__':
         full_path = os.path.join(pdb_dir, f)
         print(f"{f}: isfile={os.path.isfile(full_path)}, size={os.path.getsize(full_path)}")
     
+    if args.sanitize:
+        sanitized_path = sanitize_pdb_for_dssp(args.sanitize)
+        print(f"Sanitized PDB file created at: {sanitized_path}")
+        sys.exit(0)
+
     def process_pdb(pdb_file, pdb_dir):
         features, error = generate_feature(os.path.join(pdb_dir, pdb_file))
         if error or not isinstance(features, dict):
