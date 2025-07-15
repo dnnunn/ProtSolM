@@ -304,7 +304,7 @@ if __name__ == "__main__":
         data.aa_seq = seq_dict[name]
         data.name = name
         if pdb_name in feature_dict:
-            data.feature = torch.from_numpy(feature_dict[pdb_name]).float()
+            data.feature = torch.from_numpy(feature_dict[pdb_name]).float().unsqueeze(0)
         else:
             logger.info(f"No features found for '{pdb_name}', using default zeros")
             data.feature = torch.zeros(1, args.feature_dim)
