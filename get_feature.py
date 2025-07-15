@@ -157,15 +157,15 @@ def generate_feature(pdb_file):
             dssp_dict = custom_dssp_parser(tmp_dssp_out.name)
             if not dssp_dict:
                  raise ValueError("DSSP output is empty after parsing.")
+            # If successful, clean up the temp file
+            os.unlink(tmp_dssp_out.name)
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
-            error_msg = f"Direct mkdssp call failed. File: {sanitized_pdb_path}."
+            error_msg = f"Direct mkdssp call failed. Sanitized PDB: {sanitized_pdb_path}. DSSP output: {tmp_dssp_out.name}."
             if isinstance(e, subprocess.CalledProcessError):
                 error_msg += f"\nReturn Code: {e.returncode}\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}"
             else:
                 error_msg += f"\nException: {e}"
             return pdb_file, error_msg
-        finally:
-            os.unlink(tmp_dssp_out.name)
 
         # Process the DSSP and hydrogen bond features
         traj = md.load(sanitized_pdb_path)
