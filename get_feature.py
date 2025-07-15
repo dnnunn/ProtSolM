@@ -22,81 +22,67 @@ ss_alphabet_dic = {
 
 def sanitize_pdb_for_dssp(pdb_file):
     """
-    Ensures PDB file has a unique HEADER, TITLE, and CRYST1 line for DSSP compatibility.
-    HEADER will be 'Peptide Project PDB', TITLE will be the PDB filename (without extension), and CRYST1 will be a minimal dummy cell.
-    Returns (path_to_sanitized_pdb, is_temp_file).
+    Builds a clean PDB file from scratch to ensure DSSP compatibility.
+
+    This function reads an input PDB, writes canonical HEADER, TITLE, and CRYST1
+    records, then processes and appends only ATOM/HETATM records, ensuring they
+    are correctly formatted. It finishes by adding TER and END records.
+    This ground-up approach is more robust than patching existing lines.
     """
-    import tempfile, os
+    output_lines = []
+
+    # 1. Add canonical HEADER, TITLE, and CRYST1 records (80 chars)
+    header = 'HEADER    PEPTIDE PROJECT PDB                01-JAN-00   XXXX'
+    title = f'TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}'
+    cryst1 = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1'
+    output_lines.append(header.ljust(80) + '\n')
+    output_lines.append(title.ljust(80) + '\n')
+    output_lines.append(cryst1.ljust(80) + '\n')
+
+    last_atom_line_info = None
+    atom_serial = 0
+
+    # 2. Process only ATOM/HETATM records from the original file
     with open(pdb_file, 'r') as f:
-        lines = f.readlines()
+        for line in f:
+            if line.startswith('ATOM') or line.startswith('HETATM'):
+                atom_serial += 1
+                # Ensure chain ID in column 22 is 'A' if blank
+                if len(line) >= 22 and line[21] == ' ':
+                    line = line[:21] + 'A' + line[22:]
 
-    header_inserted = False
-    title_inserted = False
-    cryst1_inserted = False
-    # Canonical HEADER: columns 11-50 = classification, 51-59 = date, 63-66 = PDB ID
-    # Example: HEADER    PEPTIDE PROJECT PDB                01-JAN-00   XXXX
-    header_line = ("HEADER    PEPTIDE PROJECT PDB".ljust(50) + "01-JAN-00".rjust(9) + "   XXXX".rjust(11) + "\n")
-    title_line = (f"TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}".ljust(80) + "\n")
-    # Insert CRYST1 if missing (use canonical 1CRN values, exact format)
-    cryst1_line = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1\n'
+                # Use regex to fix spacing (atom name starts at col 13)
+                # This mimics: sed 's/^(ATOM  .{5})  /\1 /'
+                fixed_line = re.sub(r'^(ATOM|HETATM)(  .{5})  ', r'\1\2 ', line.rstrip()) 
 
-    # Always start with HEADER, TITLE, CRYST1
-    output_lines = [header_line, title_line, cryst1_line]
-    for line in lines:
-        if line.startswith('HEADER') or line.startswith('TITLE') or line.startswith('CRYST1'):
-            continue
-        if line.startswith('ATOM') or line.startswith('HETATM'):
-            # Fix chain ID (column 22, 1-based) if missing or blank
-            line = line.rstrip('\n')
-            if len(line) >= 22 and (line[21] == ' ' or line[21] == ''):
-                line = line[:21] + 'A' + line[22:]
-            # Mimic sed: replace double space after atom serial with single space
-            fixed_line = re.sub(r'^(ATOM  .{5})  ', r'\1 ', line)
-            # Pad to 80 characters
-            output_lines.append(fixed_line[:80].ljust(80) + "\n")
-        else:
-            # Pad END lines to 80 characters
-            if line.startswith('END'):
-                output_lines.append(line.rstrip().ljust(80) + "\n")
-            # Pad TITLE lines to 80 characters
-            elif line.startswith('TITLE'):
-                output_lines.append(line.rstrip().ljust(80) + "\n")
-            else:
-                output_lines.append(line)
+                output_lines.append(fixed_line.ljust(80) + '\n')
+                
+                # Store info from the last atom for the TER record
+                last_atom_line_info = {
+                    'resName': line[17:20].strip(),
+                    'chainID': line[21:22].strip() if line[21:22].strip() else 'A',
+                    'resSeq': line[22:26].strip()
+                }
 
+    # 3. Add a canonical TER record
+    if last_atom_line_info:
+        ter_res_name = last_atom_line_info['resName']
+        ter_chain_id = last_atom_line_info['chainID']
+        ter_res_seq = last_atom_line_info['resSeq']
+        ter_serial = atom_serial + 1
+        ter_record = f'TER   {ter_serial:>5}      {ter_res_name:>3} {ter_chain_id}{ter_res_seq:>4}'
+        output_lines.append(ter_record.ljust(80) + '\n')
 
-    insert_idx = 0
-    if not header_inserted:
-        output_lines.insert(insert_idx, header_line)
-        insert_idx += 1
-    if not title_inserted:
-        output_lines.insert(insert_idx, title_line)
-        insert_idx += 1
-    if not cryst1_inserted:
-        output_lines.insert(insert_idx, cryst1_line)
-        insert_idx += 1
+    # 4. Add a canonical END record
+    output_lines.append('END'.ljust(80) + '\n')
 
-    # Ensure TER after last ATOM/HETATM and END at file end
-    atom_end_idx = None
-    for idx, line in enumerate(output_lines):
-        if line.startswith('ATOM') or line.startswith('HETATM'):
-            atom_end_idx = idx
-    if atom_end_idx is not None:
-        # Only add TER if not present after last ATOM/HETATM
-        if atom_end_idx + 1 >= len(output_lines) or not output_lines[atom_end_idx + 1].startswith('TER'):
-            output_lines.insert(atom_end_idx + 1, 'TER\n')
-    # Remove any trailing blank lines
-    while output_lines and output_lines[-1].strip() == '':
-        output_lines.pop()
-    # Ensure END record
-    if not output_lines or not output_lines[-1].strip().startswith('END'):
-        output_lines.append('END\n')
-
-    tmp = tempfile.NamedTemporaryFile('w', delete=False, suffix='.pdb')
-    tmp.writelines(output_lines)
-    tmp.close()
-    print(f"[DEBUG] Created sanitized PDB: {tmp.name}")
-    return tmp.name, True
+    # 5. Write to a temporary file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pdb', dir='/var/tmp') as tmp_file:
+        tmp_file.writelines(output_lines)
+        sanitized_pdb_path = tmp_file.name
+    
+    logging.debug(f"Created sanitized PDB (ground-up): {sanitized_pdb_path}")
+    return sanitized_pdb_path
 
 def generate_feature(pdb_file):
     try:
