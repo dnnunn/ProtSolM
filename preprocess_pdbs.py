@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.dataset.supervise_dataset import SuperviseDataset
-from src.utils.common import set_seed
+from src.utils.utils import set_seed
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
