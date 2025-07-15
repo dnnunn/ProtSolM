@@ -6,7 +6,10 @@ import pandas as pd
 import biotite.structure.io as bsio
 import re
 import tempfile
+import logging
 sys.path.append(os.getcwd())
+
+logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
 from Bio import PDB
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
