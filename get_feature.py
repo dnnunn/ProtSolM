@@ -134,15 +134,16 @@ def generate_feature(pdb_file):
             return pdb_file, error_msg
         finally:
             os.unlink(tmp_dssp_out.name)
+
+        # Process the DSSP and hydrogen bond features
         traj = md.load(sanitized_pdb_path)
         hbonds = md.kabsch_sander(traj)
 
-        sec_structures = []
-        rsa = []
-        for i, dssp_res in enumerate(dssp):
-            sec_structures.append(dssp_res[2])
-            rsa.append(dssp_res[3])
-
+        # Sort dictionary by residue index to ensure correct order
+        sorted_keys = sorted(dssp_dict.keys(), key=lambda k: k[1][1])
+        
+        sec_structures = [dssp_dict[key][1] for key in sorted_keys]
+        rsa = [dssp_dict[key][2] for key in sorted_keys]
     except Exception as e:
         return pdb_file, str(e) + ' (file: ' + sanitized_pdb_path + ')'
     finally:
