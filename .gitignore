@@ -197,3 +197,17 @@ log/
 script_tmp/
 script_dev/
 *.gz
+
+# Local test files and outputs
+*.cif
+*.dssp
+*_feature.csv
+out.dssp
+basic_filebuf::underflow
+
+# Backup files
+*.backup
+
+# Custom datasets not tracked in git
+custom_dataset/
+
