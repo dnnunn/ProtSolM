@@ -8,6 +8,7 @@ import re
 import tempfile
 import logging
 import subprocess
+import biotite.structure.io as strucio
 sys.path.append(os.getcwd())
 
 # Set up logging
@@ -169,7 +170,7 @@ def generate_feature(pdb_file):
     final_feature["rsa"] = rsa
     final_feature["hbonds_num"] = hbonds[0].nnz
     
-    struct = biotite.structure.io.load_structure(pdb_file, extra_fields=["b_factor"])
+    struct = strucio.load_structure(pdb_file, extra_fields=["b_factor"])
     final_feature["pLDDT"] = struct.b_factor.mean()
 
     return final_feature, None
