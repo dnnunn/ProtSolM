@@ -94,44 +94,38 @@ def generate_feature(pdb_file):
         aa_seq = extract_seq_from_pdb(pdb_file)
         sanitized_pdb_path = sanitize_pdb_for_dssp(pdb_file)
         is_temp = True
-        pdb_parser = PDB.PDBParser(QUIET=True)
-        structure = pdb_parser.get_structure("protein", sanitized_pdb_path)
-        model = structure[0]
-        print(f"[DEBUG] DSSP input file: {sanitized_pdb_path}")
+
+        logging.debug(f"Bypassing Bio.PDB.DSSP, using direct mkdssp call on {sanitized_pdb_path}")
+        
+        # Primary method: direct subprocess call to mkdssp
+        import tempfile
+        import subprocess
+        from Bio.PDB.DSSP import make_dssp_dict
+
+        tmp_dssp_out = tempfile.NamedTemporaryFile(delete=False, suffix='.dssp')
+        tmp_dssp_out.close()
+        mkdssp_cmd = ['mkdssp', sanitized_pdb_path, tmp_dssp_out.name]
+        logging.debug(f"Running command: {' '.join(mkdssp_cmd)}")
+
         try:
-            # Try Bio.PDB.DSSP with explicit mkdssp path (should use correct mkdssp invocation)
-            dssp = PDB.DSSP(model, sanitized_pdb_path, dssp='mkdssp')
-        except Exception as dssp_exc:
-            # Fallback: run mkdssp via subprocess with correct arguments, then parse output
-            import tempfile
-            import subprocess
-            from Bio.PDB import make_dssp_dict
-            tmp_dssp = tempfile.NamedTemporaryFile(delete=False)
-            tmp_dssp.close()
-            mkdssp_cmd = ['mkdssp', sanitized_pdb_path, tmp_dssp.name]
-            print(f"[DEBUG] Running mkdssp command: {' '.join(mkdssp_cmd)}")
-            try:
-                with open('mkdssp_debug.log', 'a') as logf:
-                    result = subprocess.run(
-                        mkdssp_cmd,
-                        stdout=logf,
-                        stderr=logf,
-                        text=True
-                    )
-                if result.returncode != 0:
-                    with open('mkdssp_debug.log', 'r') as logf:
-                        log_content = logf.read()
-                    raise RuntimeError(f"mkdssp failed (code {result.returncode}) on {sanitized_pdb_path}. Log output:\n{log_content}")
-                dssp_dict, _ = make_dssp_dict(tmp_dssp.name)
-                # Convert dssp_dict to DSSP-like list for compatibility
-                dssp = [
-                    (None, None, d['SS'], d['ASA'])
-                    for k, d in dssp_dict.items()
-                ]
-            except Exception as sub_exc:
-                return pdb_file, f"Bio.PDB.DSSP failed: {dssp_exc}; mkdssp fallback failed: {sub_exc} (file: {sanitized_pdb_path})"
-            finally:
-                os.unlink(tmp_dssp.name)
+            result = subprocess.run(mkdssp_cmd, capture_output=True, text=True, check=True)
+            dssp_dict, _ = make_dssp_dict(tmp_dssp_out.name)
+            # Convert dict to list of tuples for compatibility with downstream code
+            dssp = [
+                (k, d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7], d[8], d[9], d[10], d[11], d[12])
+                for k, d in dssp_dict.items()
+            ]
+            if not dssp:
+                 raise ValueError("DSSP output is empty after parsing.")
+        except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
+            error_msg = f"Direct mkdssp call failed. File: {sanitized_pdb_path}."
+            if isinstance(e, subprocess.CalledProcessError):
+                error_msg += f"\nReturn Code: {e.returncode}\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}"
+            else:
+                error_msg += f"\nException: {e}"
+            return pdb_file, error_msg
+        finally:
+            os.unlink(tmp_dssp_out.name)
         traj = md.load(sanitized_pdb_path)
         hbonds = md.kabsch_sander(traj)
 
