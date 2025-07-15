@@ -115,6 +115,7 @@ def main():
     # Restore YAML config loading for full compatibility
     import yaml
     args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
+    args.gnn_config["hidden_channels"] = args.gnn_hidden_dim  # Match eval.py behavior
     plm_model = PLM_model(args).to(device)
     gnn_model = GNN_model(args).to(device)
     checkpoint = torch.load(args.gnn_model_path)
