@@ -34,8 +34,8 @@ def sanitize_pdb_for_dssp(pdb_file):
     cryst1_inserted = False
     header_line = f"HEADER    Peptide Project PDB\n"
     title_line = f"TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}\n"
-    # Strictly PDB-formatted CRYST1 line (from 1CRN)
-    cryst1_line = "CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1 21 1      2          \n"
+    # Insert CRYST1 if missing (use canonical 1CRN values, exact format)
+    cryst1_line = 'CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1           1\n'
 
     output_lines = []
     for line in lines:
