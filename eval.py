@@ -177,6 +177,14 @@ feature_dict ={}
 
 if __name__ == "__main__":
     args = create_parser()
+
+    # === FIX: Calculate feature_dim directly from the feature file ===
+    if args.feature_file:
+        feature_df = pd.read_csv(args.feature_file)
+        # Subtract the 'protein name' column to get the number of features
+        args.feature_dim = len(feature_df.columns) - 1
+    # ===============================================================
+
     args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)[args.gnn]
     args.gnn_config["hidden_channels"] = args.gnn_hidden_dim
     
@@ -337,7 +345,7 @@ if __name__ == "__main__":
     else:
         logger.info(f"Loading model state_dict directly from checkpoint with strict=False")
         gnn_model.load_state_dict(checkpoint, strict=False)
-    protssn_classification = ProtssnClassification(args)
+    protssn_classification = ProtssnClassification(args, feature_dim=args.feature_dim)
     protssn_classification.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     
