@@ -28,10 +28,7 @@ from src.utils.data_utils import extract_seq_from_pdb
 
 ss_alphabet = ['H', 'E', 'C']
 ss_alphabet_dic = {
-    "H": "H", "G": "H", "E": "E",
-    "B": "E", "I": "C", "T": "C",
-    "S": "C", "L": "C", "-": "C",
-    "P": "C"
+    'H': 'H', 'G': 'H', 'I': 'H', 'E': 'E', 'B': 'E', 'T': 'C', 'S': 'C', ' ': 'C', 'L': 'C', '-': 'C', 'P': 'C'
 }
 
 
@@ -222,7 +219,7 @@ def properties_from_dssp(features):
     h_num = features["hbonds_num"]
     plddt = features["pLDDT"]
 
-    ss8_counts = {"G": 0, "H": 0, "I": 0, "B": 0, "E": 0, "T": 0, "S": 0, "P": 0, "L": 0}
+    ss8_counts = {"G": 0, "H": 0, "I": 0, "B": 0, "E": 0, "T": 0, "S": 0, "P": 0, "L": 0, "C": 0, " ": 0}
     ss3_counts = {"H": 0, "E": 0, "C": 0}
     cutoff = [x / 100 for x in range(5, 105, 5)]
     exposed_residues = [0] * 20
