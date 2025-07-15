@@ -81,15 +81,14 @@ def main():
 
     # Load features
     logger.info("***** Loading Feature *****")
-    feature_df = pd.read_csv(args.feature_file)
+    feature_df = pd.read_csv(args.feature_file).set_index('protein name')
+    if 'L' in feature_df.columns:
+        feature_df = feature_df.drop('L', axis=1)
+    feature_columns = feature_df.columns
+    args.feature_dim = len(feature_columns)
     feature_dict = {}
-    for i, row in feature_df.iterrows():
-        # Use the correct key and drop the correct column based on your CSV header
-        key = row["protein name"]
-        feature_dict[key] = row.drop("protein name").values.astype(float)
-    args.feature_dim = len(feature_df.columns) - 1
-
-    # Load test set
+    for pdb_name, row in feature_df.iterrows():
+        feature_dict[pdb_name] = row.values.astype(float)
     logger.info("***** Loading Dataset *****")
     test_df = pd.read_csv(args.test_file)
     test_names = test_df['id'].tolist()
