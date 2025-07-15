@@ -350,14 +350,27 @@ if __name__ == "__main__":
     # Load checkpoint and extract state_dict if it's in a dictionary format
     checkpoint = torch.load(args.gnn_model_path)
     if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
-        logger.info(f"Loading model state_dict from checkpoint dictionary with strict=False")
-        gnn_model.load_state_dict(checkpoint['state_dict'], strict=False)
+        state_dict = checkpoint['state_dict']
     else:
-        logger.info(f"Loading model state_dict directly from checkpoint with strict=False")
-        gnn_model.load_state_dict(checkpoint, strict=False)
+        state_dict = checkpoint
+
+    # Remove BatchNorm keys if present (for compatibility with LayerNorm model)
+    filtered_state_dict = {k: v for k, v in state_dict.items() if not (
+        'batch_norm1.running_mean' in k or
+        'batch_norm1.running_var' in k or
+        'batch_norm1.num_batches_tracked' in k or
+        'batch_norm2.running_mean' in k or
+        'batch_norm2.running_var' in k or
+        'batch_norm2.num_batches_tracked' in k
+    )}
+
     protssn_classification = ProtssnClassification(args)
     protssn_classification.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
+    # Load state dict with strict=False and print missing/unexpected keys
+    missing, unexpected = protssn_classification.load_state_dict(filtered_state_dict, strict=False)
+    print("[DEBUG] Missing keys:", missing)
+    print("[DEBUG] Unexpected keys:", unexpected)
     
     for param in plm_model.parameters():
         param.requires_grad = False
