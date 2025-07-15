@@ -159,7 +159,7 @@ def generate_feature(pdb_file):
     if len(aa_seq) != len(sec_structure_str_8):
         return pdb_file, f"aa_seq {len(aa_seq)} and sec_structure_str_8 {len(sec_structure_str_8)} length mismatch"
 
-    sec_structure_str_3 = ''.join([ss_alphabet_dic[ss] for ss in sec_structures])
+    sec_structure_str_3 = ''.join([ss_alphabet_dic.get(ss, 'C') for ss in sec_structures])
 
     final_feature = {}
     final_feature["name"] = pdb_file.split('/')[-1]

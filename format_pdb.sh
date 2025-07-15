@@ -74,7 +74,8 @@ for pdb_file in *.pdb; do
         "CRYST1" 100.000 100.000 100.000 90.00 90.00 90.00 "P 1" 1
         
         # 5. Add the original ATOM/TER/END records
-        grep -v "^REMARK" "$pdb_file"
+        # 5. Add only the ATOM/TER/END records from the original file
+        grep -E "^(ATOM|HETATM|TER|END)" "$pdb_file"
 
     } > "$output_file"
 done
