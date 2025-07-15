@@ -119,15 +119,13 @@ def eval_model(args, model, loss_fn,
                 ):
     model_path = os.path.join(args.model_dir, args.model_name)        
     if test_data:
-        model.load_state_dict(torch.load(model_path)["state_dict"])
         test_step_runner = StepRunner(
             args=args, model=model, 
             loss_fn=loss_fn, accelerator=accelerator,
             metrics_dict=deepcopy(metrics_dict), 
-            )
-        test_epoch_runner = EpochRunner(test_step_runner)
-        with torch.no_grad():
-            model, epoch_metric_results, result_dict, ssn_embeds = test_epoch_runner(test_data)
+        )
+        epoch_runner = EpochRunner(test_step_runner)
+        model, epoch_metric_results, result_dict, ssn_embeds = epoch_runner(test_data)
         for name, metric in epoch_metric_results.items():
             epoch_metric_results[name] = [metric]
             print(f">>> {name}: {'%.3f'%metric}")
