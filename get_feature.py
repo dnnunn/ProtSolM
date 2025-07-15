@@ -26,7 +26,7 @@ ss_alphabet_dic = {
 
 def sanitize_pdb_for_dssp(pdb_file):
     """
-    Sanitizes a PDB file for DSSP by ensuring atom serial numbers are sequential.
+    Sanitizes a PDB file for DSSP by ensuring atom serial numbers are sequential and adding a default CRYST1 record if missing.
     This is a minimal-touch approach that preserves original formatting.
     """
     sanitized_lines = []
@@ -34,7 +34,13 @@ def sanitize_pdb_for_dssp(pdb_file):
     
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
-
+    
+    # Check if CRYST1 record exists; if not, add a default one
+    has_cryst1 = any(line.startswith('CRYST1') for line in lines)
+    if not has_cryst1:
+        sanitized_lines.append('CRYST1    1.000    1.000    1.000  90.00  90.00 90.00 P 1           1\n')
+        logging.debug("Added default CRYST1 record as it was missing.")
+    
     for line in lines:
         if line.startswith(('ATOM', 'HETATM', 'TER')):
             # Re-number the serial number in place for ATOM/HETATM/TER records
@@ -45,15 +51,15 @@ def sanitize_pdb_for_dssp(pdb_file):
         else:
             # Keep all other lines unchanged
             sanitized_lines.append(line)
-
+    
     # Ensure there's an END record if one doesn't exist
     if not any(line.startswith('END') for line in sanitized_lines):
         sanitized_lines.append('END\n')
-
+    
     temp_pdb = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pdb', dir='/var/tmp')
     temp_pdb.writelines(sanitized_lines)
     temp_pdb.close()
-    logging.debug(f"Created sanitized PDB (preserve-all): {temp_pdb.name}")
+    logging.debug(f"Created sanitized PDB (with CRYST1 check): {temp_pdb.name}")
     return temp_pdb.name
 
 def custom_dssp_parser(dssp_file):
