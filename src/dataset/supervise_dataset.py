@@ -203,7 +203,7 @@ class SuperviseDataset(Dataset):
             if not rec_graph:
                 self.wrong_protein_names.append(name)
                 continue
-            torch.save(rec_graph, os.path.join(self.saved_graph_path, name.split('.')[0] + '.pt'))
+            torch.save(rec_graph, os.path.join(self.saved_graph_path, name + '.pt'))
         
         with open(self.total_protein_name_file, 'w') as fp:
             for item in self.total_protein_names:
