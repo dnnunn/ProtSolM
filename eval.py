@@ -297,7 +297,7 @@ if __name__ == "__main__":
     # so we need to save the information
     def process_data(name, fd):
         graph_name = name + '_final'
-        pdb_name = name # Use the name from the test file directly
+        pdb_name = name + '_final.pdb'
 
         data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{graph_name}.pt")
         data.label = torch.tensor(label_dict[name]).view(1)
