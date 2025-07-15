@@ -45,7 +45,27 @@ def sanitize_pdb_for_dssp(pdb_file):
             title_inserted = True
         if line.startswith('CRYST1'):
             cryst1_inserted = True
-        output_lines.append(line)
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+            # Strict PDB ATOM/HETATM formatting
+            record = line[0:6].ljust(6)
+            serial = line[6:11].rjust(5)
+            name = line[12:16].ljust(4)
+            altLoc = line[16:17]
+            resName = line[17:20].rjust(3)
+            chainID = line[21:22]
+            resSeq = line[22:26].rjust(4)
+            iCode = line[26:27]
+            x = line[30:38].rjust(8)
+            y = line[38:46].rjust(8)
+            z = line[46:54].rjust(8)
+            occupancy = line[54:60].rjust(6)
+            tempFactor = line[60:66].rjust(6)
+            element = line[76:78].rjust(2)
+            # Compose strict line
+            strict_line = f"{record}{serial} {name}{altLoc}{resName} {chainID}{resSeq}{iCode}   {x}{y}{z}{occupancy}{tempFactor}          {element}\n"
+            output_lines.append(strict_line)
+        else:
+            output_lines.append(line)
 
     insert_idx = 0
     if not header_inserted:
