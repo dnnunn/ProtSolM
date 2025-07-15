@@ -118,7 +118,8 @@ def generate_feature(pdb_file):
         return pdb_file, e
     finally:
         if 'is_temp' in locals() and is_temp:
-            os.unlink(pdb_for_dssp)
+            print(f"[DEBUG] Not deleting temp sanitized PDB: {pdb_for_dssp}")
+            # os.unlink(pdb_for_dssp)  # Commented out for debugging
 
     sec_structure_str_8 = ''.join(sec_structures)
     sec_structure_str_8 = sec_structure_str_8.replace('-', 'L')
