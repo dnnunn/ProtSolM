@@ -55,9 +55,16 @@ def sanitize_pdb_for_dssp(pdb_file):
                 if len(line) >= 22 and line[21] == ' ':
                     line = line[:21] + 'A' + line[22:]
 
-                # Use regex to fix spacing (atom name starts at col 13)
-                # This mimics: sed 's/^(ATOM  .{5})  /\1 /'
-                fixed_line = re.sub(r'^(ATOM|HETATM)(  .{5})  ', r'\1\2 ', line.rstrip()) 
+                # The most robust fix: use string slicing for the fixed-width PDB format.
+                # This avoids all regex complexities and guarantees correct spacing.
+                record_type = line[0:6]
+                atom_serial = line[6:11]
+                space1 = ' '
+                atom_name = line[12:16].strip()
+                rest_of_line = line[16:]
+
+                # Reconstruct the line with guaranteed correct PDB formatting
+                fixed_line = f"{record_type}{atom_serial}{space1}{atom_name.ljust(4)}{rest_of_line}".rstrip() 
 
                 output_lines.append(fixed_line.ljust(80) + '\n')
                 
