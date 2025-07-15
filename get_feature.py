@@ -20,14 +20,41 @@ ss_alphabet_dic = {
 
 
 def sanitize_pdb_for_dssp(pdb_file):
-    """If first line is not HEADER or TITLE, insert HEADER and use a temp file."""
-    import tempfile
+    """
+    Ensures PDB file has a unique HEADER, TITLE, and CRYST1 line for DSSP compatibility.
+    HEADER will be 'Peptide Project PDB', TITLE will be the PDB filename (without extension), and CRYST1 will be a minimal dummy cell.
+    Returns (path_to_sanitized_pdb, is_temp_file).
+    """
+    import tempfile, os
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
-    if lines and not (lines[0].startswith('HEADER') or lines[0].startswith('TITLE')):
+    # Build unique header/title
+    pdb_base = os.path.basename(pdb_file)
+    pdb_name = os.path.splitext(pdb_base)[0]
+    header_line = f'HEADER    Peptide Project PDB\n'
+    title_line = f'TITLE     {pdb_name}\n'
+    cryst1_line = 'CRYST1   1.000   1.000   1.000  90.00  90.00  90.00 P 1           1\n'
+    # Check for HEADER, TITLE, CRYST1
+    has_header = any(l.startswith('HEADER') for l in lines)
+    has_title = any(l.startswith('TITLE') for l in lines)
+    has_cryst1 = any(l.startswith('CRYST1') for l in lines)
+    # Compose new lines if missing
+    new_lines = []
+    if not has_header:
+        new_lines.append(header_line)
+    if not has_title:
+        new_lines.append(title_line)
+    # Insert all lines
+    new_lines.extend(lines)
+    # Add CRYST1 if missing (after header/title, before ATOM)
+    if not has_cryst1:
+        # Find where ATOM starts
+        atom_idx = next((i for i,l in enumerate(new_lines) if l.startswith('ATOM')), len(new_lines))
+        new_lines = new_lines[:atom_idx] + [cryst1_line] + new_lines[atom_idx:]
+    # If any of the lines were missing, write to temp
+    if not (has_header and has_title and has_cryst1):
         tmp = tempfile.NamedTemporaryFile('w', delete=False, suffix='.pdb')
-        tmp.write('HEADER    GENERATED FOR DSSP\n')
-        tmp.writelines(lines)
+        tmp.writelines(new_lines)
         tmp.close()
         return tmp.name, True
     return pdb_file, False
