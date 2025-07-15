@@ -65,9 +65,10 @@ def sanitize_pdb_for_dssp(pdb_file):
             element = line[76:78].strip()
             charge = line[78:80].strip() if len(line) >= 80 else ''
             # Canonical PDB ATOM/HETATM format string
-            strict_line = ("{:<6}{:>5} {:4}{:1}{:>3} {:1}{:>4}{:1}   "
+            # Column 12 is always blank, atom name (columns 13-16) as in original
+            strict_line = ("{:<6}{:>5}{}{:4}{:1}{:>3} {:1}{:>4}{:1}   "
                            "{:>8}{:>8}{:>8}{:>6}{:>6}          {:>2}{:>2}\n").format(
-                record, serial, name, altLoc, resName, chainID, resSeq, iCode,
+                record, serial, ' ', name, altLoc, resName, chainID, resSeq, iCode,
                 x, y, z, occupancy, tempFactor, element, charge)
             output_lines.append(strict_line)
         else:
