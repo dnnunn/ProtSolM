@@ -345,7 +345,7 @@ if __name__ == "__main__":
     else:
         logger.info(f"Loading model state_dict directly from checkpoint with strict=False")
         gnn_model.load_state_dict(checkpoint, strict=False)
-    protssn_classification = ProtssnClassification(args, feature_dim=args.feature_dim)
+    protssn_classification = ProtssnClassification(args)
     protssn_classification.to(device)
     loss_fn = torch.nn.CrossEntropyLoss()
     
