@@ -28,8 +28,57 @@ def sanitize_pdb_for_dssp(pdb_file):
     import tempfile, os
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
-    # Build unique header/title
-    return pdb_file, False
+
+    header_inserted = False
+    title_inserted = False
+    cryst1_inserted = False
+    header_line = f"HEADER    Peptide Project PDB\n"
+    title_line = f"TITLE     {os.path.splitext(os.path.basename(pdb_file))[0]}\n"
+    # Strictly PDB-formatted CRYST1 line (from 1CRN)
+    cryst1_line = "CRYST1   40.960   18.650   22.520  90.00  90.77  90.00 P 1 21 1      2          \n"
+
+    output_lines = []
+    for line in lines:
+        if line.startswith('HEADER'):
+            header_inserted = True
+        if line.startswith('TITLE'):
+            title_inserted = True
+        if line.startswith('CRYST1'):
+            cryst1_inserted = True
+        output_lines.append(line)
+
+    insert_idx = 0
+    if not header_inserted:
+        output_lines.insert(insert_idx, header_line)
+        insert_idx += 1
+    if not title_inserted:
+        output_lines.insert(insert_idx, title_line)
+        insert_idx += 1
+    if not cryst1_inserted:
+        output_lines.insert(insert_idx, cryst1_line)
+        insert_idx += 1
+
+    # Ensure TER after last ATOM/HETATM and END at file end
+    atom_end_idx = None
+    for idx, line in enumerate(output_lines):
+        if line.startswith('ATOM') or line.startswith('HETATM'):
+            atom_end_idx = idx
+    if atom_end_idx is not None:
+        # Only add TER if not present after last ATOM/HETATM
+        if atom_end_idx + 1 >= len(output_lines) or not output_lines[atom_end_idx + 1].startswith('TER'):
+            output_lines.insert(atom_end_idx + 1, 'TER\n')
+    # Remove any trailing blank lines
+    while output_lines and output_lines[-1].strip() == '':
+        output_lines.pop()
+    # Ensure END record
+    if not output_lines or not output_lines[-1].strip().startswith('END'):
+        output_lines.append('END\n')
+
+    tmp = tempfile.NamedTemporaryFile('w', delete=False, suffix='.pdb')
+    tmp.writelines(output_lines)
+    tmp.close()
+    print(f"[DEBUG] Created sanitized PDB: {tmp.name}")
+    return tmp.name, True
 
 def generate_feature(pdb_file):
     try:
