@@ -82,7 +82,9 @@ def main():
     feature_df = pd.read_csv(args.feature_file)
     feature_dict = {}
     for i, row in feature_df.iterrows():
-        feature_dict[row["name"]] = row.drop("name").values.astype(float)
+        # Use the correct key and drop the correct column based on your CSV header
+        key = row["protein name"]
+        feature_dict[key] = row.drop("protein name").values.astype(float)
     args.feature_dim = len(feature_df.columns) - 1
 
     # Load test set
