@@ -296,26 +296,16 @@ if __name__ == "__main__":
     # multi-thread load data will shuffle the order of data
     # so we need to save the information
     def process_data(name, fd):
-        data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{name}.pt")
+        pdb_name = name + '.pdb'
+        data = torch.load(f"{args.supv_dataset}/{graph_dir.capitalize()}/processed/{pdb_name}.pt")
         data.label = torch.tensor(label_dict[name]).view(1)
         data.aa_seq = seq_dict[name]
         data.name = name
-        fe = None
-        if args.feature_file:
-            for key, value in fd.items():
-                if key == str(name):
-                    fe = value
-     
-        if fe is None:
-            logger.info(f"No features found for '{name}', using default zeros")
-            # Create default feature vector with the same dimension as other features
-            if args.feature_dim > 0:
-                fe = [0.0] * args.feature_dim
-            else:
-                # If we don't know the dimension, use a reasonable default
-                fe = [0.0] * 100
-                
-        data.feature = torch.tensor(fe).view(1, -1)
+        if pdb_name in feature_dict:
+            data.feature = torch.from_numpy(feature_dict[pdb_name]).float()
+        else:
+            logger.info(f"No features found for '{pdb_name}', using default zeros")
+            data.feature = torch.zeros(len(data.aa_seq), args.feature_dim)
         return data
     
     def collect_fn(batch):
