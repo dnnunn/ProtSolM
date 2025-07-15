@@ -47,30 +47,12 @@ def sanitize_pdb_for_dssp(pdb_file):
             title_inserted = True
         if line.startswith('CRYST1'):
             cryst1_inserted = True
+        import re
         if line.startswith('ATOM') or line.startswith('HETATM'):
-            # Parse fields according to PDB format columns (1-indexed)
-            record = line[0:6].strip()
-            serial = line[6:11].strip()
-            name = line[12:16]  # Do not strip, preserve original spacing
-            altLoc = line[16:17].strip()
-            resName = line[17:20].strip()
-            chainID = line[21:22].strip()
-            resSeq = line[22:26].strip()
-            iCode = line[26:27].strip()
-            x = line[30:38].strip()
-            y = line[38:46].strip()
-            z = line[46:54].strip()
-            occupancy = line[54:60].strip()
-            tempFactor = line[60:66].strip()
-            element = line[76:78].strip()
-            charge = line[78:80].strip() if len(line) >= 80 else ''
-            # Canonical PDB ATOM/HETATM format string
-            # Column 12 is always blank, atom name (columns 13-16) as in original
-            strict_line = ("{:<6}{:>5}{}{:4}{:1}{:>3} {:1}{:>4}{:1}   "
-                           "{:>8}{:>8}{:>8}{:>6}{:>6}          {:>2}{:>2}\n").format(
-                record, serial, ' ', name, altLoc, resName, chainID, resSeq, iCode,
-                x, y, z, occupancy, tempFactor, element, charge)
-            output_lines.append(strict_line)
+            # Mimic sed: replace double space after atom serial with single space
+            fixed_line = re.sub(r'^(ATOM  .{5})  ', r'\1 ', line.rstrip('\n'))
+            # Pad to 80 characters
+            output_lines.append(fixed_line[:80].ljust(80) + "\n")
         else:
             # Pad END lines to 80 characters
             if line.startswith('END'):
