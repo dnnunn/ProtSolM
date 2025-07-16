@@ -171,7 +171,7 @@ def create_parser():
     parser.add_argument("--feature_embed_dim", type=int, default=512, help="feature embed dim")
     parser.add_argument("--use_plddt_penalty", action="store_true", help="use plddt penalty")
     parser.add_argument("--c_alpha_max_neighbors", type=int, default=20, help="graph dataset K")
-    parser.add_argument("--gnn_model_path", type=str, default="./model/protssn_k20_h512.pt", help="gnn model path")
+    parser.add_argument("--gnn_model_path", type=str, default="./ckpt/feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt", help="gnn model path")
     
     # load model
     parser.add_argument("--model_dir", type=str, default="./ckpt", help="model save dir")
