@@ -166,6 +166,14 @@ def main():
         args.feature_dim = len(feature_columns)
         for pdb_name, row in feature_df.iterrows():
             feature_dict[pdb_name.split(".")[0]] = row.values.astype(float)
+    # === Robust feature dimension check ===
+    EXPECTED_FEATURE_DIM = 1792  # This must match the training/checkpoint expectation
+    if args.feature_dim != EXPECTED_FEATURE_DIM:
+        logger.error(f"Feature dimension mismatch: expected {EXPECTED_FEATURE_DIM}, but got {args.feature_dim}.\n"
+                     f"Check your feature file and ensure it matches the training feature set exactly in columns, order, and count.\n"
+                     f"The checkpoint will not load unless this matches.\n"
+                     f"If you do not have the correct feature file, you must obtain it from training or reconstruct it.")
+        sys.exit(1)
     logger.info("***** Loading Dataset *****")
     test_df = pd.read_csv(args.test_file)
     test_names = test_df['id'].tolist()
