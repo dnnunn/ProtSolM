@@ -336,4 +336,31 @@ if __name__ == '__main__':
                         property_dict[k] = []
                     property_dict[k].append(v)
     
-    pd.DataFrame(property_dict).to_csv(args.out_file, index=False)
+    # --- Canonical feature column enforcement ---
+    CANONICAL_FEATURE_COLUMNS = [
+        'L', '1-C', '1-D', '1-E', '1-R', '1-H',
+        'Turn-forming residues fraction', 'GRAVY',
+        'ss8-G', 'ss8-H', 'ss8-I', 'ss8-B', 'ss8-E', 'ss8-T', 'ss8-S', 'ss8-P', 'ss8-L',
+        'ss3-H', 'ss3-E', 'ss3-C',
+        'Hydrogen bonds', 'Hydrogen bonds per 100 residues',
+        'Exposed residues fraction by 5%', 'Exposed residues fraction by 10%', 'Exposed residues fraction by 15%',
+        'Exposed residues fraction by 20%', 'Exposed residues fraction by 25%', 'Exposed residues fraction by 30%',
+        'Exposed residues fraction by 35%', 'Exposed residues fraction by 40%', 'Exposed residues fraction by 45%',
+        'Exposed residues fraction by 50%', 'Exposed residues fraction by 55%', 'Exposed residues fraction by 60%',
+        'Exposed residues fraction by 65%', 'Exposed residues fraction by 70%', 'Exposed residues fraction by 75%',
+        'Exposed residues fraction by 80%', 'Exposed residues fraction by 85%', 'Exposed residues fraction by 90%',
+        'Exposed residues fraction by 95%', 'Exposed residues fraction by 100%',
+        'pLDDT', 'protein name'
+    ]
+
+    # Build DataFrame enforcing canonical columns and order
+    df = pd.DataFrame(property_dict)
+    # Fill missing columns with 0
+    for col in CANONICAL_FEATURE_COLUMNS:
+        if col not in df.columns:
+            logging.warning(f"Feature column '{col}' missing in output, filling with 0.")
+            df[col] = 0
+    # Reorder columns
+    df = df[CANONICAL_FEATURE_COLUMNS]
+    # Write to CSV
+    df.to_csv(args.out_file, index=False)
