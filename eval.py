@@ -211,63 +211,6 @@ if __name__ == "__main__":
             feature_dict[protein_name] = row.values.astype(np.float32)
         # === DEFINITIVE FIX END ===
 
-        if type(args.feature_name) != list:
-            args.feature_name = [args.feature_name]
-
-        feature_aa_composition = ["1-C", "1-D", "1-E", "1-R", "1-H", "Turn-forming residues fraction"]
-        if "aa_composition" in args.feature_name:
-            aa_composition_df = feature_df[feature_aa_composition]
-            args.feature_dim += len(feature_aa_composition)
-        
-        feature_gravy = ["GRAVY"]
-        if "gravy" in args.feature_name:
-            gravy_df = feature_df[feature_gravy]
-            args.feature_dim += len(feature_gravy)
-        
-        feature_ss_composition = ["ss8-G", "ss8-H", "ss8-I", "ss8-B", "ss8-E", "ss8-T", "ss8-S", "ss8-P", "ss8-L", "ss3-H", "ss3-E", "ss3-C"]
-        if "ss_composition" in args.feature_name:
-            ss_composition_df = feature_df[feature_ss_composition]
-            args.feature_dim += len(feature_ss_composition)
-        
-        feature_hygrogen_bonds = ["Hydrogen bonds", "Hydrogen bonds per 100 residues"]
-        if "hygrogen_bonds" in args.feature_name:
-            hygrogen_bonds_df = feature_df[feature_hygrogen_bonds]
-            args.feature_dim += len(feature_hygrogen_bonds)
-        
-        feature_exposed_res_fraction = [
-            "Exposed residues fraction by 5%", "Exposed residues fraction by 10%", "Exposed residues fraction by 15%", 
-            "Exposed residues fraction by 20%", "Exposed residues fraction by 25%", "Exposed residues fraction by 30%", 
-            "Exposed residues fraction by 35%", "Exposed residues fraction by 40%", "Exposed residues fraction by 45%", 
-            "Exposed residues fraction by 50%", "Exposed residues fraction by 55%", "Exposed residues fraction by 60%", 
-            "Exposed residues fraction by 65%", "Exposed residues fraction by 70%", "Exposed residues fraction by 75%", 
-            "Exposed residues fraction by 80%", "Exposed residues fraction by 85%", "Exposed residues fraction by 90%", 
-            "Exposed residues fraction by 95%", "Exposed residues fraction by 100%"
-            ]
-        if "exposed_res_fraction" in args.feature_name:
-            exposed_res_fraction_df = feature_df[feature_exposed_res_fraction]
-            args.feature_dim += len(feature_exposed_res_fraction)
-        
-        feature_pLDDT = ["pLDDT"]
-        if "pLDDT" in args.feature_name:
-            plddt_df = feature_df[feature_pLDDT]
-            args.feature_dim += len(feature_pLDDT)
-        
-        
-        for i in tqdm(range(len(feature_df))):
-            name = feature_df.index[i].split(".")[0]
-            feature_dict[name] = []
-            if "aa_composition" in args.feature_name:
-                feature_dict[name] += list(aa_composition_df.iloc[i])
-            if "gravy" in args.feature_name:
-                feature_dict[name] += list(gravy_df.iloc[i])
-            if "ss_composition" in args.feature_name:
-                feature_dict[name] += list(ss_composition_df.iloc[i])
-            if "hygrogen_bonds" in args.feature_name:
-                feature_dict[name] += list(hygrogen_bonds_df.iloc[i])
-            if "exposed_res_fraction" in args.feature_name:
-                feature_dict[name] += list(exposed_res_fraction_df.iloc[i])
-            if "pLDDT" in args.feature_name:
-                feature_dict[name] += list(plddt_df.iloc[i])
     
     # load dataset
     logger.info("***** Loading Dataset *****")

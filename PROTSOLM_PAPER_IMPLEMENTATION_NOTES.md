@@ -92,7 +92,7 @@ python eval.py \
   --feature_name "aa_composition" "gravy" "ss_composition" "hygrogen_bonds" "exposed_res_fraction" "pLDDT" \
   --use_plddt_penalty \
   --gnn_hidden_dim 512 \
-  --gnn_model_path model/protssn_k20_h512.pt \
+  --gnn_model_path ckpt/feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt \
   --pooling_method attention1d \
   --model_dir ckpt \
   --model_name feature512_norm_pp_attention1d_k20_h512_lr5e-4.pt \
