@@ -238,7 +238,7 @@ if __name__ == "__main__":
     label_dict, seq_dict = {}, {}
     def get_dataset(df):
         names, node_nums = [], []
-        for name, label, seq in zip(df["name"], df["label"], df["aa_seq"]):
+        for name, label, seq in zip(df["id"], df["label"], df["aa_seq"]):
             names.append(name)
             label_dict[name] = label
             seq_dict[name] = seq
