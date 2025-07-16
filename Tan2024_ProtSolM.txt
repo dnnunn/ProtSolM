@@ -1,0 +1,1341 @@
+P ROT S OL M: Protein Solubility Prediction with
+Multi-modal Features
+Jia Zheng
+
+Yang Tan
+
+Liang Hong
+
+Bingxin Zhou
+
+arXiv:2406.19744v1 [q-bio.QM] 28 Jun 2024
+
+Shanghai Jiao Tong University Shanghai Jiao Tong University Shanghai Jiao Tong University Shanghai Jiao Tong University
+Shanghai, China
+Shanghai, China
+Shanghai, China
+Shanghai, China
+bingxin.zhou@sjtu.edu.cn
+hong3liang@sjtu.edu.cn
+zhengjia2002@sjtu.edu.cn
+tyang@mail.ecust.edu.cn
+
+Abstract—Understanding protein solubility is essential for their
+functional applications. Computational methods for predicting
+protein solubility are crucial for reducing experimental costs and
+enhancing the efficiency and success rates of protein engineering.
+Existing methods either construct a supervised learning scheme
+on small-scale datasets with manually processed physicochemical
+properties, or blindly apply pre-trained protein language models
+to extract amino acid interaction information. The scale and
+quality of available training datasets leave significant room
+for improvement in terms of accuracy and generalization. To
+address these research gaps, we propose P ROT S OL M, a novel
+deep learning method that combines pre-training and fine-tuning
+schemes for protein solubility prediction. P ROT S OL M integrates
+information from multiple dimensions, including physicochemical
+properties, amino acid sequences, and protein backbone structures. Our model is trained using PDBS OL, the largest solubility
+dataset that we have constructed. PDBS OL includes over 60, 000
+protein sequences and structures. We provide a comprehensive
+leaderboard of existing statistical learning and deep learning
+methods on independent datasets with computational and experimental labels. P ROT S OL M achieved state-of-the-art performance
+across various evaluation metrics, demonstrating its potential to
+significantly advance the accuracy of protein solubility prediction.
+Index Terms—Deep Learning, Protein Solubility Prediction,
+Protein Language Model, Equivariant Graph Neural Networks
+
+I. I NTRODUCTION
+Protein solubility is a crucial aspect of scientific research
+and industrial applications. It plays a pivotal role in determining the absorption and metabolism of antibody drugs
+[1], enhancing the yield and production efficiency in enzyme
+engineering [2], [3], and understanding protein localization
+and interaction mechanisms [4]. However, the majority of
+expressed non-transmembrane proteins are either insoluble
+or tend to precipitate or aggregate [5]. Even among soluble
+proteins, many have insufficient solubility, limiting their scope
+of experimental evaluation approaches and applications. The
+high proportion of insoluble proteins and the high cost of
+experiments make it impractical to experimentally validate
+the solubility of every designed protein. Therefore, there is a
+This work was supported by the National Natural Science Foundation of
+China (11974239; 62302291), the Innovation Program of Shanghai Municipal
+Education Commission (2019-01-07-00-02-E00076), Shanghai Jiao Tong University Scientific and Technological Innovation Funds (21X010200843), the
+Student Innovation Center at Shanghai Jiao Tong University, and Shanghai
+Artificial Intelligence Laboratory.
+
+need for simulation or computational methods to assess protein
+solubility before experimental validation.
+Early solubility prediction methods were based on physical
+simulations that used molecular dynamics to calculate the free
+energy transfer between the condensed and the solution phases
+[6], [7]. However, these methods were limited in accuracy
+and had high computational costs, restricting their application to large-scale predictions, such as screening designed
+drug molecules or engineered mutants. Alternatively, statistical
+methods, such as support vector machine [8]–[10] and gradient
+boosting [11], learn the projection of handcrafted protein
+attributes and solubility from thousands of labeled data. As
+such models are only capable of processing tabular data, input
+data have to be manually extracted based on expert knowledge,
+such as amino acid (AA) composition, charge, and relative
+surface area. However, due to limitations in dataset scale and
+model complexity, these methods suffered from significant deficiencies in prediction accuracy and generalization, resulting
+in limited practical applicability.
+With the advancement of deep learning technology, many
+end-to-end prediction methods have been developed. These
+methods use Transformers [12]–[14] or convolutional neural
+networks [15]–[17] to directly analyze the interactions between AAs. Compared to statistical learning methods, deep
+neural networks offer higher prediction accuracy and reduce
+the dependency on feature engineering. However, the limitation of small dataset sizes still persists, causing many
+models to overfit particular test sets, making their reliability
+in general applications questionable. Nevertheless, sequencebased encoding methods neglect the local geometric structure
+of proteins, even though such structures have been found to
+be significantly associated with protein solubility (e.g., αhelices [18] and surface patches [19]). Although previous
+studies attempted to encode structure-aware representations by
+applying graph neural networks, the graphs are constructed
+through contact maps instead of protein backbone structures
+[20]–[22]. This indirect way leads to unnecessary information
+loss and additional processing steps, potentially reducing the
+performance of the trained model.
+The conflict between the urgent need for protein solubility
+prediction and the significant deficiencies in current deep
+learning models as well as training datasets forms a clear
+research gap. To tackle these issues, this study proposes a
+
+Fig. 1. An illustration of P ROT S OL M for protein solubility prediction. P ROT S OL M employs a pre-training module (in red box) to encode AA-level sequence
+and structure information, which is then compressed to vector representations with weighted residue layers and attention pooling. At the protein level, handcrafted physicochemical properties related to solubility are normalized and concatenated to the vector hidden representation. The joint representations are
+input into fully connected layers for label prediction. These green modules are fine-tuned using PDBS OL to better fit the solubility prediction task.
+
+new deep learning framework based on pre-training and finetuning called P ROT S OL M, which comprehensively learns and
+integrates effective vector representations of protein multimodalities, including sequences, structures, and physicochemical information, for accurate protein solubility prediction. As
+shown in Fig. 1, we use the ESM2 framework [23] to encode
+the sequence information of AAs and employ roto-translation
+equivariant graph neural networks [24] to enhance the local
+interactions based on the protein backbone. This AA-level
+encoding module, reinforced by geometric information, is pretrained using a wild-type protein dataset. To further align with
+the solubility prediction objective, the AA-level encoding is
+compressed using attention pooling and concatenated with a
+handful of pre-defined global features that have been proven
+related to solubility. For a particular protein to approximate
+the solubility, the joint vector representation is sent to readout layers for prediction. The second half of the model is finetuned on PDBS OL, which, to the best of our knowledge, is the
+largest protein solubility data with comprehensive information
+on protein entities, including sequence, structure, physicochemical properties, and computational solubility labels.
+In a nutshell, this study makes contributions to the community from three perspectives:
+1) We propose the first solubility prediction deep learning
+model that directly integrates protein sequence, structure,
+and physicochemical properties. Compared to existing
+prediction methods, the proposed P ROT S OL M leverages
+pre-training and fine-tuning schemes to thoroughly learn
+the construction logic of natural proteins and explore the
+relationship between their extracted features and solubility.
+This enhances the model’s overall prediction accuracy and
+generalization capability (Section III).
+2) We propose the largest, most recent, and most compre-
+
+hensive solubility training and testing dataset, PDBS OL.
+It includes protein sequences, structures, solubility labels,
+and solubility-related physicochemical properties. The total
+number of proteins available for training and analysis
+exceeds 60, 000 entries (Section IV).
+3) We construct a comprehensive leaderboard on the prediction performance of P ROT S OL M and existing baseline
+methods for two independent test datasets with computational and experimental solubility labels. A complete list
+of statistical learning and deep learning-based methods
+has been assessed. We also fine-tuned popular pre-trained
+methods to show their potential for applying to solubility prediction when sufficient training data is available.
+Notably, our P ROT S OL M outperforms existing supervised
+learning models and fine-tuned self-supervised learning
+models on various widely-applied evaluation metrics in
+both test datasets (Section V).
+II. R ELATED W ORKS
+The importance of solubility has given rise to a series
+of prediction methods. This section reviews three existing
+approaches, including physics-based calculations, statistical
+learning, and deep learning methods. The latter two approaches are more suitable for making rapid and accurate
+predictions on large-scale datasets, but their predictive power
+depends heavily on the quality of the datasets for training and
+validation. To this end, the last paragraph reviews the current
+training and testing datasets available.
+a) Simulation-based Solutions: One way of predicting
+protein solubility is through molecular dynamics (MD) simulations. This approach calculates the free energy of transfer
+from the condensed phase to the solution phase [6]. However,
+the difficulty in assessing conformational entropy and solvent
+
+effects limits the prediction accuracy of this computationally intensive method. While there are alternative methods
+to increase simulation accuracy, such as nuclear magnetic
+resonance experiments [7], the high experimental cost restricts
+their use to study only a small number of proteins. In modern
+applications such as protein engineering, it is unrealistic to use
+MD simulation as a screening tool for predicting the solubility
+of a large number of protein candidates.
+b) Statistical Learning Solutions: The second type of
+solution optimizes statistical learning-based models from a
+set of tabular data to find the mapping relationship between
+the extracted features and solubility. Existing methods often
+construct discriminative models in machine learning, such
+as Regularized Linear Regressor [25], [26], support vector
+machines [9], [10], [27], and gradient boosting machines [11],
+[28]. The tabular data usually contains manually extracted
+attributes from protein sequences based on domain knowledge,
+such as AA composition [9], [11], [29], fractions of secondary structures [30]–[32], and physicochemical properties
+of proteins (e.g., exposed residue fraction, isoelectric point,
+and chemical flexibility) [10], [27], [28]. These methods
+balance computational costs and prediction performance by
+summarizing and extracting important features from protein
+data. Additionally, since both the model and input data are
+relatively simple, it is possible to interpret the input data’s
+strongly related attributes to solubility by analyzing the learned
+parameters or feature importance of the fitted model, providing
+a degree of interpretability [10], [33]. Nevertheless, these
+prediction methods require explicit preprocessing steps, and
+patterns related to solubility that are excluded in the handcrafted features significantly limit the model’s predictive performance. Moreover, the relatively simple model architecture
+cannot handle more complex protein data (such as protein
+structures) and cannot extract more concrete mapping relationships from larger datasets, which further weakens the model’s
+prediction accuracy and generalization.
+c) Deep Learning Solutions: The development of deep
+learning methods and the enrichment of protein databases
+have driven the proposal of more powerful models to directly
+learn solubility-related patterns from protein sequences and
+structures. Existing mainstream methods primarily analyze
+amino acid sequences, using models such as Transformer
+[12]–[14], LSTM [34], [35], and CNN [15]–[17] to extract
+hidden representations of sequences and connect fully connected layers to form a complete supervised learning model
+for training. Other studies attempted to construct the local
+interactive relationships between amino acids and use GNN
+to learn these spatial relationships due to the important role
+of protein structure in solubility [20], [21], [36]. However,
+these methods rely on contact maps, an intermediate variable
+from additional processing, which inevitably causes information loss. Moreover, the majority of existing deep learning
+solutions, whether based on sequences or structures, train
+a supervised learning model using a limited dataset. This
+approach not only fails to fully leverage the vast amount of
+available protein sequences and structural data but also raises
+
+questions about whether the model can generalize to accurately
+predict the solubility of other proteins.
+d) Training and Evaluation Datasets: The datasets used
+to train and validate statistical learning and deep learning
+models can be divided into two categories: those from solubility experiments and those from other protein databases.
+The former type typically contains tens to a few thousands
+of protein instances that are labeled with binarized [37]
+or percentage [27], [38] solubility measurements. Although
+the solubility labels of these datasets are of higher quality,
+their relatively small size creates a trade-off between model
+expressiveness and generalizability. The latter type of datasets,
+instead, are manually compiled from various sources, such as
+PDB [39] and TargetTrack [40], and can contain up to tens
+of thousands of data points. The labels for these datasets are
+usually automatically assigned based on common knowledge.
+Especially for deep learning models, PROSO II [25] and its
+variants [15], [31], [41] are frequently employed as the training dataset. They perform preprocessing such as redundancy
+reduction and bias correction on data from various sources.
+However, these training datasets only include protein entities
+before 2015 and consist solely of protein sequences and handcrafted features. Moreover, protein backbone structures are
+missing in these datasets.
+III. P ROTEIN S OLUBILITY P REDICTION WITH P ROT S OL M
+Denote P = {XAA , G(V, E), xprop } an arbitrary protein of
+L AAs, which includes the AA sequence XAA ∈ RL×20 , a
+graph G(V, E) of the protein backbone structure, and m handcrafted protein-level physicochemical properties xprop ∈ Rm .
+The task of protein solubility prediction assigns binary labels
+of soluble and insoluble by
+ŷ = f (XAA , G(V, E), xprop )
+
+(1)
+
+using a trained predictor f (·). This section introduces the
+formulation of P and the proposed P ROT S OL M to fit f (·).
+A. Formulation of Protein G
+Define G = (V, E) an kNN graph of a protein’s backbone.
+Each node v ∈ V represents an AA, and it is connected to
+up to k nearest nodes within 30Åby undirected edges e ∈ E.
+Both nodes and edges are featured with vector attributes, with
+the node attributes WV = ESM 650M(XAA ) ∈ RL×1280 are
+hidden semantic embeddings of AA types extracted by the
+ESM2 encoder [23]. The edge attributes WE ∈ RL×93 are
+defined following [42] to feature relationships of connected
+nodes based on inter-atomic distances, local N-C positions,
+and sequential position encoding. To preserve the 3D geometry
+of the protein backbone, XV ∈ RL×3 is defined to record 3D
+coordinates of AAs in the Euclidean space.
+The protein-level features xprop ∈ R42 are composed of
+seven sets of solubility-related features (Table I). The first three
+sets can be directly extracted from the fasta file, including
+the fraction of five charged AAs (cysteine, aspartate, glutamic
+acid, arginine, and histidine) relative to the total number of
+amino acids, the fraction of turn-forming AAs (aspartic acid,
+
+TABLE I
+P ROTEIN - LEVEL PHYSIOCHEMICAL FEATURES .
+Feature
+fraction of charged AA (C, D, E, R, H)
+fraction of turn-forming residues (N, G, P)
+GRAVY index
+fraction of secondary structure
+fraction of exposed residues
+hydrogen bonds
+structure confidence
+
+TABLE II
+S OURCE OF RAW DATA FOR PDBS OL .
+
+Dimension
+
+Source
+
+Dataset
+
+# Total
+
+# Soluble
+
+# Insoluble
+
+5
+1
+1
+12
+20
+2
+1
+
+fasta
+fasta
+fasta
+DSSP
+DSSP
+MDTraj
+PDB
+
+UniProtKB
+TargetTrack
+PDB
+PRSP-2k
+
+4,337
+468,406
+402,059
+2,001
+
+4,337
+287,844
+402,059
+1,000
+
+0
+180,562
+0
+1,001
+
+PDBS OL (raw)
+
+311,635
+
+198,164
+
+113,471
+
+glycine, and proline) relative to the total number of amino
+acids, and the grand average of hydropathy (GRAVY) index,
+which reports the average of the hydropathy values of all
+the amino acids in a protein sequence [43]. The fractions of
+secondary structures are calculated from DSSP classifications
+[44] with 3 states and 9 states (including an undefined state).
+The fraction of exposed residues [32] lists the fractions of AAs
+with relative solvent accessibility (RSA) cutoffs between 5%
+and 100%. The amount and density of hydrogen bonds are
+predicted by MDT RAJ [45]. The structure confidence is represented by average pLDDT from ESMFold [23] prediction.
+
+hP = AttnPool(HAA ) = softmax(Conv(HAA )) · HAA , (3)
+where Conv(·) represents a 1-dimensional convolution along
+the dimension of the AA sequence and · computes the
+weighted average of AA embeddings.
+The output vector hP is concatenated to hprop , the transformed protein-level attributes by linear projection Wprop ∈
+R42×512 and batch normalization, i.e.,
+h = concat(hP , hprop ),
+where hprop = Wprop · BatchNorm(xprop ).
+
+(4)
+
+The resulting multi-level representation of the protein is sent
+to fully connected layers to output binary classification
+
+B. Model Pipeline
+As illustrated in Fig. 1, P ROT S OL M consists of two modules of AA-level feature encoding and protein-level solubility
+prediction. The former (in blue boxes) is pre-trained with selfsupervised learning, and the latter (in green boxes) is finetuned with solubility labels.
+a) Pre-training Module: The AA-level encoding module
+is pre-trained to extract adequate structure-aware evolutionary
+embedding for proteins. The evolutionary embedding WV is
+encoded from protein sequences by ESM2 [23], which is used
+as node features for protein graphs. For graph representation
+learning, EGNN layers [46] are employed in consideration
+of rotation equivariance and translation invariance of protein
+representation. This module is trained on a denoising task [42],
+[47], where the input AA types for ESM2 are perturbed with
+multinomial noise, i.e., an AA in the input protein sequence
+has a chance of p to mutate to one of 20 AAs (including itself)
+with the replacement distribution defined by the frequency
+of AA types observed in wild-type proteins. The hidden
+embedding of AAs HG is projected by a fully connected layer
+to a 20-dimensional output Y0 that indicates the probability
+of each node being one of the 20 types of AA. The model
+is trained to minimize the cross-entropy of the predicted and
+ground-truth AA types.
+b) Fine-tuning Module: The fine-tuning module utilizes
+the AA-level hidden representation {WV , HG } from the pretrained module and trains the remaining network layers with
+the solubility dataset (Section IV). The AA-level sequence and
+structure representation is summarized by a weighted residual
+connection with the pLDDT penalty term, i.e.,
+HAA = WV + pLDDT × HG .
+
+The combined embedding HAA is then processed to obtain
+protein-level representation by an attention pooling layer [48]:
+
+(2)
+
+ŷ = Wo (DropOut(ReLU(h)),
+
+(5)
+
+where the ReLU activation and the dropout layer are for
+avoiding overfitting, and the final projection Wo ∈ R1792×2
+is added for predicting the labels.
+IV. DATASET AND M ATERIAL
+As discussed previously, existing datasets for solubility
+are neither large enough nor up-to-date. We thus prepare
+PDBS OL, a new dataset for training solubility models.
+A. Source of Raw Data
+PDBS OL obtains raw data from diverse publicly available
+protein databases (Table II), including:
+• UniProtKB [49]: a large database of protein sequences with
+high-quality, hand-annotated protein records. Following [9],
+we selected ‘Reviewed’ proteins labeled with ‘E. coli
+enzymes’ or ‘S. cerevisiae enzymes’. A total of
+4, 337 ‘soluble’ proteins were obtained by this approach.
+• TargetTrack [40]: a comprehensive database of proteins
+with the results of structural experiments and corresponding status history. We picked both positive and negative
+instances based on their experimental status [25]. All records
+that reached soluble or subsequent status were considered
+‘soluble’. For ‘insoluble’ samples, we included terminated records that were highly likely to have failed to
+be expressed or purified. The total number of soluble and
+insoluble proteins was 287, 844 and 180, 562, respectively.
+• PDB [39]: a vast collection of experimental protein structures. We selected 402, 059 ‘soluble’ proteins that were
+encoded into plasmids and expressed in E. coli.
+
+TABLE III
+P REPROCESSING DETAILS ON PDBS OL .
+
+TABLE IV
+S OURCE OF E XTERNAL T EST DATASET.
+Dataset
+
+Dataset
+
+# Total
+
+# Soluble
+
+# Insoluble
+
+PDBS OL (raw)
+− Non-protein Entities
+− Biased Sequential Components
+− Sequence Redundancy
+− Transmembrane Proteins
+− Biased Length & Class
+
+311,635
+302,214
+280,297
+70,167
+67,984
+64,598
+
+198,164
+189,551
+169,507
+37,678
+35,495
+33,763
+
+113,471
+112,663
+110,790
+32,489
+32,489
+30,835
+
+PDBS OL-train
+PDBS OL-valid
+PDBS OL-test
+
+58,138
+3,230
+3,230
+
+30,419
+1,669
+1,675
+
+27,719
+1,561
+1,555
+
+PRSP-2k [50]: a balanced solubility dataset with 2, 001
+instances [8], [25]. The source of data and processing step
+is similar to PDBS OL, we thus merge them into our dataset.
+After removing repetitive proteins, the initial PDBS OL collects 198, 164 soluble and 113, 471 insoluble proteins.
+•
+
+B. Data Preprocessing
+The bias and redundancy in the raw data need to be removed
+through additional processing steps before being used by a
+model for pattern recognition.
+1) Non-protein Entities: We remove samples annotated with
+‘virus’, ‘DNA’, or ‘RNA’ to exclude non-protein crystal
+structures from PDB. Sequences consisting solely of A’,
+T’, U’, C’, and G’ strings, as well as those with more than
+5 consecutive ‘X’ stings, are also excluded.
+2) Biased Sequential Components: We remove sequences
+containing tags such as ‘MGSSHHHH’, ‘MHHHHHHS’,
+and ‘MRGSHHHH’. These His-tags, used for affinity purification, are highly correlated with soluble proteins [51].
+3) Sequence Redundancy: To eliminate redundant samples
+and avoid data leakage, we employed MMS EQS 2 [52] to
+cluster sequences at a 25% identity cutoff. Sequences with
+fewer than 20 AAs or more than 2, 000 AAs were also
+removed due to their rarity.
+4) Transmembrane Proteins: Given the unique solubility properties of transmembrane proteins, we use
+D EEP TMHMM [53] to exclude predicted transmembrane
+proteins (labeled as ‘TM’, ‘SP+TM’, or ’BETA’).
+5) Biased Length & Class: Protein solubility is generally
+negatively correlated with its length [54]. To remove this
+bias, we divide proteins into eight groups based on their
+sequence length and balance the group size.
+In total, we obtain 64, 598 processed samples for the complete PDBS OL. We randomly split 5% for validation and 5%
+for test. The resulting training, validation, and test dataset
+contains 58, 138, 3, 230, and 3, 230 proteins, respectively. The
+full detail is provided in Table III. Except for the sequence details and the solubility label, PDBS OL also provides predicted
+structures for each protein by ESMFold [23].
+C. Overview of the Training and Testing Datasets
+For the processed PDBS OL, we use PDBS OL-train to finetune P ROT S OL M, as well as other zero-shot baseline models
+
+# Total
+
+# Soluble
+
+# Insoluble
+
+ESOL-agg
+NESG-SoluProt
+NESG-DSResSol
+
+2,155
+1,784
+3,640
+
+951
+1,052
+1,817
+
+1,204
+732
+1,823
+
+External Test Dataset
+
+7,579
+
+3,820
+
+3,759
+
+(see Section V for more details). The validation set is used for
+model selection, and the independent PDBS OL-test constructs
+a standard test set for evaluating the performance of different
+baseline models. For a more comprehensive comparison, we
+collect external test datasets from three open benchmarks used
+in the literature, including ESOL-agg [27], NESG-SoluProt
+[11], and DESG-DEResSol [12], [17]. The labels in the latter
+two datasets are binarized. For ESOL, we follow [55] and
+define scores lower than 30 as insoluble samples and higher
+than 70 as soluble samples. We also compare the sequence
+identity of proteins in the three external datasets and remove
+75 repetitive samples. Note that a 25% sequence identity upper
+limit between PDBS OL-train and the external test dataset is
+guaranteed to avoid data leakage. Any similar sequences from
+the training set were removed during preprocessing.
+V. E XPERIMENT
+We conduct comprehensive testing and comparison of a
+series of open-source statistical learning and deep learning
+models on the standard test dataset and external test datasets.
+All experiments and protein folding with ESMFold were conducted on 8 80GB-VRAM A800 GPUs. The implementation
+can be found at https://github.com/tyang816/ProtSolM.
+A. Experimental Protocol
+a) Training Setup: P ROT S OL M is constructed with the
+modules introduced in Section III. The pre-trained module
+employs ProtSSN-k20_h512 [47] for joint structure and
+sequence embedding, with the evolutionary embedding extracted by ESM-650M [23]. This step outputs an AA-level
+hidden representation of 512 dimension. For the fine-tuning
+module, we used the AdamW optimizer with a learning rate
+set at 0.0005, a weight decay of 0.01, and a dropout rate
+of 0.1 for the output layer. To ensure stable training costs
+and avoid memory explosion, we adopted a dynamic batching
+approach, filling each batch up to 16, 000 tokens to ensure
+n × l ≤ 16, 000, with n being the number of sequences and l
+being the maximum length of sequences at the current batch.
+For the vanilla PLMs, each batch contains a max of 80, 000
+tokens, including the padding tokens. The maximum training
+epoch was set to 30 with a patience of 5. The monitor for
+early stopping for all experiments is based on the accuracy
+(ACC) of the validation dataset.
+b) Baseline Methods: The solubility prediction performance of P ROT S OL M is compared on two types of models. The first is supervised machine learning or deep learning models, including DeepSoluE [34], ccSOL omics [10],
+
+TABLE V
+P ERFORMANCE COMPARISON ON THE STANDARD TEST DATASET.
+Model
+
+Version
+
+Standard Test Dataset (PDBS OL-test)
+ACC
+
+Precision
+
+Recall
+
+AUC
+
+MCC
+
+External Test Dataset
+ACC
+
+Precision
+
+Recall
+
+AUC
+
+MCC
+
+0.603
+0.522
+0.613
+0.503
+0.594
+0.544
+0.530
+
+0.623
+0.524
+0.605
+0.530
+0.626
+0.527
+0.600
+
+0.539
+0.578
+0.669
+0.118
+0.485
+0.943
+0.201
+
+0.636
+0.530
+0.655
+0.568
+0.695
+0.603
+
+0.208
+0.044
+0.227
+0.018
+0.195
+0.137
+0.086
+
+Supervised Domain Models
+DeepSoluE [34]
+ccSOL omics [10]
+SoluProt [11]
+SKADE [41]
+Camsol [26]
+NetSolP [12]
+DSResSOL [17]
+
+-
+
+0.578
+0.533
+0.646
+0.656
+0.580
+0.540
+0.658
+
+0.595
+0.545
+0.634
+0.773
+0.605
+0.539
+0.732
+
+0.588
+0.599
+0.750
+0.476
+0.546
+0.785
+0.538
+
+0.610
+0.610
+0.733
+0.727
+0.572
+0.717
+
+0.156
+0.061
+0.292
+0.349
+0.163
+0.071
+0.335
+
+ESM2 [23]
+
+t30 150M
+t33 650M
+
+0.646
+0.648
+
+0.657
+0.670
+
+0.650
+0.618
+
+0.646
+0.649
+
+0.292
+0.298
+
+0.598
+0.597
+
+0.612
+0.620
+
+0.554
+0.514
+
+0.600
+0.597
+
+0.198
+0.197
+
+ProtBert [56]
+
+uniref
+bfd
+
+0.623
+0.642
+
+0.632
+0.662
+
+0.670
+0.617
+
+0.621
+0.642
+
+0.244
+0.285
+
+0.568
+0.592
+
+0.568
+0.613
+
+0.593
+0.520
+
+0.568
+0.593
+
+0.135
+0.188
+
+ProtT5 [56]
+
+xl uniref50
+xl bfd
+
+0.647
+0.632
+
+0.671
+0.664
+
+0.611
+0.573
+
+0.645
+0.634
+
+0.269
+0.269
+
+0.570
+0.582
+
+0.598
+0.605
+
+0.451
+0.491
+
+0.571
+0.582
+
+0.147
+0.168
+
+Ankh [57]
+
+base
+large
+
+0.636
+0.648
+
+0.657
+0.657
+
+0.605
+0.655
+
+0.636
+0.648
+
+0.273
+0.295
+
+0.593
+0.602
+
+0.616
+0.614
+
+0.512
+0.568
+
+0.594
+0.602
+
+0.191
+0.205
+
+P ROT S OL M
+
+k10 h512
+k20 h512
+k30 h512
+
+0.789
+0.794
+0.796
+
+0.655
+0.664
+0.652
+
+0.462
+0.446
+0.446
+
+0.607
+0.608
+0.602
+
+0.224
+0.229
+0.215
+
+Fine-tuned Protein Language Models
+
+Fine-tuned Multi-modal and Multi-level Model (Ours)
+0.782
+0.804
+0.804
+
+0.824
+0.798
+0.783
+
+0.790
+0.794
+0.789
+
+0.578
+0.588
+0.577
+
+0.606
+0.607
+0.601
+
+† The top three are highlighted by First, Second, Third.
+
+SoluProt [11], SKADE [41], Camsol [26], NetSolP [12], and
+DSResSOL [17]. The second category contains fine-tuned
+protein language models, including different versions of ESM2
+[23], ProtBert [56], and encoder-decoder architecture models:
+ProtT5 [56], Ankh [57]. For the second type methods, we
+fine-tune them with PDBS OL on the published checkpoints
+from self-supervised learning procedures. All models are implemented based on the officially released program or web
+server listed in Appendix B.
+B. Baseline Comparison
+Table V reports the overall performance of baseline methods on the standard test dataset and external test datasets.
+Various evaluation metrics are used to provide a comprehensive assessment of the prediction performance, including
+accuracy (ACC), precision, recall, the area under the ROC
+curve (AUC), and Matthew’s correlation coefficient (MCC).
+Unless specified by the authors, all predictions are binarized with 0.5 classification threshold. Different versions of
+P ROT S OL M achieved the overall best performance across the
+five evaluation metrics on both test datasets. Notably, the
+prediction performance of P ROT S OL M significantly surpassed
+other models on PDBS OL-test. Moreover, fine-tuned protein
+language models generally outperformed supervised domain
+models, indicating that increasing the model size and training
+dataset (even with unlabeled pre-training data) helps improve
+solubility prediction performance. On the other hand, most
+models had score differences within 0.2 on the external test
+datasets, with P ROT S OL M outperforms baseline methods on
+
+Fig. 2. Confusion matrix of domain models (up) and P ROT S OL M (down) on
+standard test set (left) and external test set (right).
+
+ACC, precision, and MCC. The high scores achieved by
+domain models on recall and AUC, aside from the possibility
+that some domain models might have been picked for a specific
+test dataset, are due to the highly biased results predicted
+by these models. For instance, ccSOL and DSResSol tend to
+provide more negative predictions, and NetSolP reports more
+positive predictions than others (Fig. 2).
+C. Additional Investigation
+Table VI reports the performance PDBS OL-test by the
+ablation models of P ROT S OL M. We validate the combinatorial
+effect of the three main components in the fine-tuned module,
+including the pLDDT penalty (PP) used in the weighted
+residual layer, the hand-crafted protein-level physicochemical
+features (feature), and the attention pooling layer (AttnPool).
+The prediction performance drops most significantly when
+substituting the attention pooling with an average pooling
+layer. Removing PP and physicochemical features, although
+
+TABLE VI
+A BLATION STUDY OF P ROT S OL M ON PDBS OL - TEST.
+Component
+
+ACC
+
+Precision
+
+Recall
+
+AUC
+
+MCC
+
+full P ROT S OL M
+w/o PP
+w/o AttnPool
+w/o feature
+w/o feature+PP
+w/o feature+PP+AttnPool
+
+0.794
+0.791
+0.779
+0.791
+0.787
+0.773
+
+0.804
+0.792
+0.773
+0.791
+0.776
+0.763
+
+0.798
+0.811
+0.811
+0.813
+0.828
+0.815
+
+0.794
+0.791
+0.777
+0.791
+0.785
+0.771
+
+0.588
+0.582
+0.557
+0.582
+0.574
+0.545
+
+is possible to refine the model with a few high-quality labeled
+data, such as experimental results.
+In summary, P ROT S OL M represents a significant step forward in protein solubility prediction, combining advanced
+deep learning techniques with comprehensive dataset utilization. Our model not only addresses existing limitations but
+also opens new avenues for research and application in protein
+engineering, drug development, and biotechnology. By providing a more accurate and generalized solubility prediction tool,
+P ROT S OL M has the potential to accelerate scientific discovery
+and innovation in these fields
+R EFERENCES
+
+Fig. 3. t-SNE visualization of P ROT S OL M’s protein-level representation for
+standard test dataset (left) and external test dataset (right).
+
+less significant, also results in worse performance in the overall
+prediction. This observation implies that the hidden sequence
+and structure representation extracted by large pre-trained
+models provide abundant information for understanding proteins. However, the prediction model on a specific downstream
+task can still benefit from adding high-quality supplementary
+features. Moreover, we investigate the expressivity of learned
+protein embedding by P ROT S OL M. The results are visualized
+through t-SNE in Fig. 3. On both test datasets, a dot represents a protein-level hidden representation (before the final
+readout layer) encoded by P ROT S OL M. Overall, the soluble
+and insoluble samples are separable for both datasets.
+VI. D ISCUSSION AND C ONCLUSION
+In this study, we addressed the research gap for accurate and
+generalized protein solubility prediction by proposing P ROTS OL M, a novel deep learning framework that integrates
+multi-modalities of proteins including sequence, structure,
+and physicochemical properties. P ROT S OL M is pre-trained on
+large protein sequence and structure datasets, and fine-tuned
+with PDBS OL to fit the solubility prediction task, which is the
+largest and most comprehensive dataset to date, which includes
+over 60,000 protein sequences, structures, and solubility labels.
+Our benchmark tests against existing SOTA machine learning
+and deep learning methods on multiple experimentally-based
+open benchmarks across various evaluation metrics.
+Despite advancements, several challenges are left to address
+in the future. First, improvements on the interpretability of
+P ROT S OL M is needed. While deep learning models in general
+lack explainability, developing tools to understand the specific
+contribution of different features to solubility predictions could
+enhanced the usefulness and reliability in practical applications. Also, the current version of P ROT S OL M is trained on
+computational labels to maximize the use of available data. It
+
+[1] M. Vendruscolo, T. P. Knowles, and C. M. Dobson, “Protein solubility
+and protein homeostasis: a generic view of protein misfolding disorders,”
+Cold Spring Harbor perspectives in biology, vol. 3, no. 12, p. a010454,
+2011.
+[2] N. Habibi, S. Z. Mohd Hashim, A. Norouzi, and M. R. Samian, “A
+review of machine learning methods to predict the solubility of overexpressed recombinant proteins in escherichia coli,” BMC bioinformatics,
+vol. 15, pp. 1–16, 2014.
+[3] W.-C. Chan, P.-H. Liang, Y.-P. Shih, U.-C. Yang, W.-c. Lin, and C.-N.
+Hsu, “Learning to predict expression efficacy of vectors in recombinant
+protein production,” BMC bioinformatics, vol. 11, pp. 1–12, 2010.
+[4] A. A. Tokmakov, A. Kurotani, and K.-I. Sato, “Protein pi and intracellular localization,” Frontiers in Molecular Biosciences, vol. 8, p. 775736,
+2021.
+[5] Y. Fang and J. Fang, “Discrimination of soluble and aggregation-prone
+proteins based on sequence information,” Molecular BioSystems, vol. 9,
+no. 4, pp. 806–811, 2013.
+[6] H. Tjong and H.-X. Zhou, “Prediction of from calculation of transfer
+free energy,” Biophysical journal, vol. 95, no. 6, pp. 2601–2609, 2008.
+[7] A. De Simone, A. Dhulesia, G. Soldi, M. Vendruscolo, S.-T. D. Hsu,
+F. Chiti, and C. M. Dobson, “Experimental free energy surfaces reveal
+the mechanisms of maintenance of protein solubility,” Proceedings of
+the National Academy of Sciences, vol. 108, no. 52, pp. 21 057–21 062,
+2011.
+[8] P. Smialowski, A. J. Martin-Galiano, A. Mikolajka, T. Girschick, T. A.
+Holak, and D. Frishman, “Protein solubility: sequence based prediction
+and experimental verification,” Bioinformatics, vol. 23, no. 19, pp. 2536–
+2542, 2007.
+[9] C. N. Magnan, A. Randall, and P. Baldi, “Solpro: accurate sequencebased prediction of protein solubility,” Bioinformatics, vol. 25, no. 17,
+pp. 2200–2207, 2009.
+[10] F. Agostini, M. Vendruscolo, and G. G. Tartaglia, “Sequence-based
+prediction of protein solubility,” Journal of molecular biology, vol. 421,
+no. 2-3, pp. 237–241, 2012.
+[11] J. Hon, M. Marusiak, T. Martinek, A. Kunka, J. Zendulka, D. Bednar,
+and J. Damborsky, “Soluprot: prediction of soluble protein expression
+in escherichia coli,” Bioinformatics, vol. 37, no. 1, pp. 23–28, 2021.
+[12] V. Thumuluri, H.-M. Martiny, J. J. Almagro Armenteros, J. Salomon,
+H. Nielsen, and A. R. Johansen, “Netsolp: predicting protein solubility in
+escherichia coli using language models,” Bioinformatics, vol. 38, no. 4,
+pp. 941–946, 2022.
+[13] R. Rao, N. Bhattacharya, N. Thomas, Y. Duan, P. Chen, J. Canny,
+P. Abbeel, and Y. Song, “Evaluating protein transfer learning with tape,”
+Advances in neural information processing systems, vol. 32, 2019.
+[14] X. Han, L. Zhang, K. Zhou, and X. Wang, “Progan: Protein solubility
+generative adversarial nets for data augmentation in dnn framework,”
+Computers & Chemical Engineering, vol. 131, p. 106533, 2019.
+[15] S. Khurana, R. Rawi, K. Kunji, G.-Y. Chuang, H. Bensmail, and
+R. Mall, “Deepsol: a deep learning framework for sequence-based
+protein solubility prediction,” Bioinformatics, vol. 34, no. 15, pp. 2605–
+2613, 2018.
+[16] X. Wu and L. Yu, “Epsol: sequence-based protein solubility prediction
+using multidimensional embedding,” Bioinformatics, vol. 37, no. 23, pp.
+4314–4320, 2021.
+
+[17] M. Madani, K. Lin, and A. Tarakanova, “Dsressol: A sequence-based
+solubility predictor created with dilated squeeze excitation residual
+networks,” International Journal of Molecular Sciences, vol. 22, no. 24,
+p. 13555, 2021.
+[18] R. Qing, S. Hao, E. Smorodina, D. Jin, A. Zalevsky, and S. Zhang,
+“Protein design: From the aspect of water solubility and stability,”
+Chemical Reviews, vol. 122, no. 18, pp. 14 085–14 179, 2022.
+[19] P. Chan, R. A. Curtis, and J. Warwicker, “Soluble expression of proteins
+correlates with a lack of positively-charged surface,” Scientific reports,
+vol. 3, no. 1, p. 3333, 2013.
+[20] J. Chen, S. Zheng, H. Zhao, and Y. Yang, “Structure-aware protein
+solubility prediction from sequence through graph convolutional network
+and predicted contact map,” Journal of cheminformatics, vol. 13, pp. 1–
+10, 2021.
+[21] B. Li and D. Ming, “Gatsol, an enhanced predictor of protein solubility
+through the synergy of 3d structure graph and large language modeling,”
+BMC bioinformatics, vol. 25, no. 1, p. 204, 2024.
+[22] J. Wang, S. Chen, Q. Yuan, J. Chen, D. Li, L. Wang, and Y. Yang,
+“Predicting the effects of mutations on protein solubility using graph
+convolution network and protein language model representation,” Journal of Computational Chemistry, vol. 45, no. 8, pp. 436–445, 2024.
+[23] Z. Lin, H. Akin, R. Rao, B. Hie, Z. Zhu, W. Lu, N. Smetanin, R. Verkuil,
+O. Kabeli, Y. Shmueli et al., “Evolutionary-scale prediction of atomiclevel protein structure with a language model,” Science, vol. 379, no.
+6637, pp. 1123–1130, 2023.
+[24] V. G. Satorras, E. Hoogeboom, and M. Welling, “E (n) equivariant graph
+neural networks,” in International conference on machine learning.
+PMLR, 2021, pp. 9323–9332.
+[25] P. Smialowski, G. Doose, P. Torkler, S. Kaufmann, and D. Frishman,
+“Proso ii–a new method for protein solubility prediction,” The FEBS
+journal, vol. 279, no. 12, pp. 2192–2200, 2012.
+[26] P. Sormanni, F. A. Aprile, and M. Vendruscolo, “The camsol method of
+rational design of protein mutants with enhanced solubility,” Journal of
+molecular biology, vol. 427, no. 2, pp. 478–490, 2015.
+[27] X. Han, X. Wang, and K. Zhou, “Develop machine learning-based
+regression predictive models for engineering protein solubility,” Bioinformatics, vol. 35, no. 22, pp. 4640–4646, 2019.
+[28] F. Mehmood, S. Arshad, and M. Shoaib, “Rppsp: a robust and precise
+protein solubility predictor by utilizing novel protein sequence encoder,”
+IEEE Access, 2023.
+[29] D. Plewczynski, L. Slabinski, A. Tkacz, L. Kajan, L. Holm, K. Ginalski,
+and L. Rychlewski, “The rpsp: Web server for prediction of signal
+peptides,” Polymer, vol. 48, no. 19, pp. 5493–5496, 2007.
+[30] M. Hebditch, M. A. Carballo-Amador, S. Charonis, R. Curtis, and
+J. Warwicker, “Protein–sol: a web tool for predicting protein solubility
+from sequence,” Bioinformatics, vol. 33, no. 19, pp. 3098–3100, 2017.
+[31] B. K. Bhandari, P. P. Gardner, and C. S. Lim, “Solubility-weighted
+index: fast and accurate prediction of protein solubility,” Bioinformatics,
+vol. 36, no. 18, pp. 4691–4698, 2020.
+[32] R. Rawi, R. Mall, K. Kunji, C.-H. Shen, P. D. Kwong, and G.-Y. Chuang,
+“Parsnip: sequence-based protein solubility prediction using gradient
+boosting machine,” Bioinformatics, vol. 34, no. 7, pp. 1092–1098, 2018.
+[33] Q. Hou, J. M. Kwasigroch, M. Rooman, and F. Pucci, “Solart: a
+structure-based method to predict protein solubility and aggregation,”
+Bioinformatics, vol. 36, no. 5, pp. 1445–1452, 2020.
+[34] C. Wang and Q. Zou, “Prediction of based on sequence physicochemical
+patterns and distributed representation information with deepsolue,”
+BMC biology, vol. 21, no. 1, p. 12, 2023.
+[35] M. Heinzinger, A. Elnaggar, Y. Wang, C. Dallago, D. Nechaev,
+F. Matthes, and B. Rost, “Modeling aspects of the language of
+life through transfer-learning protein sequences,” BMC bioinformatics,
+vol. 20, pp. 1–17, 2019.
+[36] T. Gu, C. Wang, C. Wu, Y. Lou, J. Xu, C. Wang, K. Xu, C. Ye,
+and Y. Song, “Hybridgnn: Learning hybrid representation for recommendation in multiplex heterogeneous networks,” in 2022 IEEE 38th
+International Conference on Data Engineering (ICDE). IEEE, 2022,
+pp. 1355–1367.
+[37] W. N. Price, S. K. Handelman, J. K. Everett, S. N. Tong, A. Bracic,
+J. D. Luff, V. Naumov, T. Acton, P. Manor, R. Xiao et al., “Large-scale
+experimental studies show unexpected amino acid effects on protein
+expression and solubility in vivo in e. coli,” Microbial Informatics and
+Experimentation, vol. 1, pp. 1–20, 2011.
+[38] E. Uemura, T. Niwa, S. Minami, K. Takemoto, S. Fukuchi, K. Machida,
+H. Imataka, T. Ueda, M. Ota, and H. Taguchi, “Large-scale aggregation
+
+analysis of eukaryotic proteins reveals an involvement of intrinsically
+disordered regions in protein folding,” Scientific reports, vol. 8, no. 1,
+p. 678, 2018.
+[39] H. M. Berman, J. Westbrook, Z. Feng, G. Gilliland, T. N. Bhat,
+H. Weissig, I. N. Shindyalov, and P. E. Bourne, “The protein data bank,”
+Nucleic acids research, vol. 28, no. 1, pp. 235–242, 2000.
+[40] H. M. Berman, J. D. Westbrook, M. J. Gabanyi, W. Tao, R. Shah,
+A. Kouranov, T. Schwede, K. Arnold, F. Kiefer, L. Bordoli et al., “The
+protein structure initiative structural genomics knowledgebase,” Nucleic
+acids research, vol. 37, no. suppl 1, pp. D365–D368, 2009.
+[41] D. Raimondi, G. Orlando, P. Fariselli, and Y. Moreau, “Insight into
+the driving forces with neural attention,” PLoS computational biology,
+vol. 16, no. 4, p. e1007722, 2020.
+[42] B. Zhou, L. Zheng, B. Wu, Y. Tan, O. Lv, K. Yi, G. Fan, and L. Hong,
+“Protein engineering with lightweight graph denoising neural networks,”
+Journal of Chemical Information and Modeling, 2023.
+[43] J. Kyte and R. F. Doolittle, “A simple method for displaying the
+hydropathic character of a protein,” Journal of molecular biology, vol.
+157, no. 1, pp. 105–132, 1982.
+[44] W. Kabsch and C. Sander, “Dictionary of protein secondary structure: pattern recognition of hydrogen-bonded and geometrical features,”
+Biopolymers: Original Research on Biomolecules, vol. 22, no. 12, pp.
+2577–2637, 1983.
+[45] R. T. McGibbon, K. A. Beauchamp, M. P. Harrigan, C. Klein, J. M.
+Swails, C. X. Hernández, C. R. Schwantes, L.-P. Wang, T. J. Lane,
+and V. S. Pande, “Mdtraj: a modern open library for the analysis of
+molecular dynamics trajectories,” Biophysical journal, vol. 109, no. 8,
+pp. 1528–1532, 2015.
+[46] V. G. Satorras, E. Hoogeboom, and M. Welling, “E (n) equivariant graph
+neural networks,” in International conference on machine learning.
+PMLR, 2021, pp. 9323–9332.
+[47] Y. Tan, B. Zhou, L. Zheng, G. Fan, and L. Hong, “Semantical and
+topological protein encoding toward enhanced bioactivity and thermostability,” bioRxiv, pp. 2023–12, 2023.
+[48] Y. Tan, M. Li, P. Tan, Z. Zhou, H. Yu, G. Fan, and L. Hong,
+“Peta: Evaluating the impact of protein transfer learning with sub-word
+tokenization on downstream applications,” arXiv:2310.17415, 2023.
+[49] T. U. Consortium, “The Universal Protein Resource (UniProt),” Nucleic
+Acids Research, vol. 35, no. suppl 1, pp. D193–D197, 2006.
+[50] C. C. H. Chang, J. Song, B. T. Tey, and R. N. Ramanan, “Bioinformatics
+approaches for improved recombinant protein production in escherichia
+coli: prediction,” Briefings in bioinformatics, vol. 15, no. 6, pp. 953–962,
+2014.
+[51] E. A. Woestenenk, M. Hammarström, S. van den Berg, T. Härd, and
+H. Berglund, “His tag effect on solubility of human proteins produced in
+escherichia coli: a comparison between four expression vectors,” Journal
+of structural and functional genomics, vol. 5, pp. 217–229, 2004.
+[52] M. Steinegger and J. Söding, “Mmseqs2 enables sensitive protein
+sequence searching for the analysis of massive data sets,” Nature
+biotechnology, vol. 35, no. 11, pp. 1026–1028, 2017.
+[53] J. Hallgren, K. D. Tsirigos, M. D. Pedersen, J. J. Almagro Armenteros,
+P. Marcatili, H. Nielsen, A. Krogh, and O. Winther, “Deeptmhmm
+predicts alpha and beta transmembrane proteins using deep neural
+networks,” BioRxiv, pp. 2022–04, 2022.
+[54] R. F. Albu, G. T. Chan, M. Zhu, E. T. Wong, F. Taghizadeh, X. Hu, A. E.
+Mehran, J. D. Johnson, J. Gsponer, and T. Mayor, “A feature analysis
+of lower solubility proteins in three eukaryotic systems,” Journal of
+proteomics, vol. 118, pp. 21–38, 2015.
+[55] T. Niwa, B.-W. Ying, K. Saito, W. Jin, S. Takada, T. Ueda, and
+H. Taguchi, “Bimodal protein solubility distribution revealed by an
+aggregation analysis of the entire ensemble of escherichia coli proteins,”
+Proceedings of the National Academy of Sciences, vol. 106, no. 11, pp.
+4201–4206, 2009.
+[56] A. Elnaggar, M. Heinzinger, C. Dallago, G. Rehawi, Y. Wang, L. Jones,
+T. Gibbs, T. Feher, C. Angerer, M. Steinegger et al., “Prottrans: Toward
+understanding the language of life through self-supervised learning,”
+IEEE transactions on pattern analysis and machine intelligence, vol. 44,
+no. 10, pp. 7112–7127, 2021.
+[57] A. Elnaggar, H. Essam, W. Salah-Eldin, W. Moustafa, M. Elkerdawy,
+C. Rochereau, and B. Rost, “Ankh: Optimized protein language model
+unlocks general-purpose modelling,” arXiv:2301.06568, 2023.
+
+A PPENDIX A
+A DDITIONAL E XPERIMENTAL R ESULTS
+This section provides more experimental results in supplementary of the main text.
+Fig. 4-5 visualizes the learning curves of ablation models
+and the fine-tuned models, respectively. From Fig. 4, we
+can see that attention pooling has a greater impact on the
+performance of downstream tasks, followed by features and
+PP. From Fig. 5, we can see that ProtT5-xl uniref50 performs
+best on the validation dataset, but it can be seen that there is
+no significant difference between the performance of ProtT5xl uniref50 and other models on the standard test dataset and
+the additional test dataset.
+Fig. 6. Learning curves of different P ROT S OL M models.
+
+Fig. 4. Learning curves of ablation study.
+
+Fig. 7. Confusion matrix of fine-tuned protein language models.
+TABLE VII
+C OMPUTATION COST OF DIFFERENT MODELS ON A800 GPU.
+Model
+ESM2
+ProtBert
+ProtT5
+Fig. 5. Learning curves of fine-tuning protein language models.
+Ankh
+
+From Fig. 6, we can observe that on the validation dataset,
+as the number of neighbors increases when using KNN to build
+the graph from a protein structure, the validation performance
+decreases, but this is not observed on the test dataset.
+In supplement to Fig. 2 in the main text, Fig. 7 reports
+the class-wide detailed prediction performance of fine-tuned
+protein language models.
+
+P ROT S OL M
+
+Version
+
+Time Cost
+
+t30 150M
+t33 650M
+uniref
+bfd
+xl uniref50
+xl bfd
+base
+large
+k10 h512
+k20 h512
+k30 h512
+
+19h 56m
+36h 47m
+24h 01m
+32h 48m
+124h 57m
+124h 58m
+50h 14m
+84h 43m
+26h 07m
+27h 28m
+32h 21m
+
+Table VII lists the computational time required for finetuning a pre-trained model on PDBS OL-train. While the ma-
+
+jority of models require 20-50 hours to complete the training
+procedure, our P ROT S OL M is one of the best-performing
+models that finished the fine-tuning process the fastest.
+A PPENDIX B
+BASELINE I MPLEMENTS
+We list in Table VIII the open-sourced programs or web
+servers we used for training and testing the baseline methods.
+TABLE VIII
+BASELINE AVAILABILITY
+
+Method
+
+Source
+
+DeepSoluE [34]
+ccSOL omics [10]
+SoluProt [11]
+SKADE [41]
+Camsol [26]
+NetSolP [12]
+DSResSOL [17]
+
+http://lab.malab.cn/∼wangchao/softs/DeepSoluE/
+http://s.tartaglialab.com/page/ccsol group
+https://loschmidt.chemi.muni.cz/soluprot/
+https://bitbucket.org/eddiewrc/skade/src/
+https://www-cohsoftware.ch.cam.ac.uk/index.php/
+https://services.healthtech.dtu.dk/services/NetSolP-1.0/
+https://www.mdpi.com/article/10.3390/ijms222413555/s1
+
+ESM2 [23]
+ProtBert [56]
+ProtT5 [56]
+Ankh [57]
+
+https://huggingface.co/facebook/esm2 t33 650M UR50D
+https://huggingface.co/Rostlab/prot bert
+https://huggingface.co/Rostlab/prot t5 xl uniref50
+https://huggingface.co/ElnaggarLab/ankh-base
+
+
