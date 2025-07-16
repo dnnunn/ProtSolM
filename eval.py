@@ -88,19 +88,22 @@ class EpochRunner:
     def __call__(self, dataloader):
         loop = tqdm(dataloader, total=len(dataloader), file=sys.stdout)
         total_loss = 0
-        result_dict = {'name':[], 'aa_seq':[], 'label':[], 'pred_label':[]}
+        result_dict = {'name':[], 'aa_seq':[], 'label':[], 'pred_label':[], 'probability':[]}
         ssn_embeds = []
         for batch in loop:
             step_loss, model, metrics_dict, pred_label, ssn_embed = self.steprunner(batch)
             # Debug: Print raw logits for the batch and compute probabilities
             with torch.no_grad():
                 logits, _ = model(plm_model, gnn_model, batch, True)
-                print("[DEBUG] Raw logits for batch:", logits.detach().cpu().numpy())
+                logits_np = logits.detach().cpu().numpy()
                 probs = torch.softmax(logits, dim=1)[:, 1].detach().cpu().numpy()  # Probability of soluble (class 1)
-                print("[DEBUG] Soluble probabilities for batch:", probs)
+                print("[DEBUG] Raw logits for batch (first 5):", logits_np[:5])
+                print("[DEBUG] Soluble probabilities for batch (first 5):", probs[:5])
+                print("[DEBUG] Predicted labels for batch:", pred_label)
+                print("[DEBUG] Unique predicted labels in batch:", set(pred_label))
+                # Optionally, print the corresponding true labels
+                print("[DEBUG] True labels for batch:", [data.label.item() for data in batch])
             result_dict["pred_label"].extend(pred_label)
-            if "probability" not in result_dict:
-                result_dict["probability"] = []
             result_dict["probability"].extend(probs.tolist())
             result_dict["name"].extend([data.name for data in batch])
             result_dict["aa_seq"].extend([data.aa_seq for data in batch])
@@ -260,13 +263,16 @@ if __name__ == "__main__":
         if name in feature_dict:
             feature_tensor = torch.from_numpy(feature_dict[name]).float().unsqueeze(0)
             logger.info(f"Loaded features for canonical ID '{name}' with sum: {torch.sum(feature_tensor)}")
+            print(f"[DEBUG] Feature sum for {name}: {torch.sum(feature_tensor).item()}")
             data.feature = feature_tensor
         elif pdb_name in feature_dict:
             feature_tensor = torch.from_numpy(feature_dict[pdb_name]).float().unsqueeze(0)
             logger.info(f"Loaded features for suffixed name '{pdb_name}' with sum: {torch.sum(feature_tensor)}")
+            print(f"[DEBUG] Feature sum for {pdb_name}: {torch.sum(feature_tensor).item()}")
             data.feature = feature_tensor
         else:
             logger.info(f"No features found for '{name}' or '{pdb_name}', using default zeros")
+            print(f"[DEBUG] Feature sum for {name} (zeros): 0.0")
             data.feature = torch.zeros(1, args.feature_dim)
         return data
     
