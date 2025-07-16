@@ -277,11 +277,11 @@ def properties_from_dssp(features):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--pdb_file', type=str)
-    parser.add_argument('--pdb_dir', type=str)
-    parser.add_argument('--num_workers', type=int, default=12)
-    parser.add_argument('--out_file', type=str)
+    parser = argparse.ArgumentParser(description='Extract features from PDB files for ProtSolM.')
+    parser.add_argument('--pdb_dir', type=str, required=True, help='Directory containing PDB files')
+    parser.add_argument('--csv', type=str, required=True, help='CSV file with canonical protein IDs (column "id")')
+    parser.add_argument('--out_file', type=str, required=True, help='Output CSV file for features')
+    parser.add_argument('--num_workers', type=int, default=4, help='Number of worker threads')
     parser.add_argument('--sanitize', type=str, help='Path to PDB file to sanitize for DSSP compatibility')
     args = parser.parse_args()
     
@@ -290,24 +290,24 @@ if __name__ == '__main__':
         os.makedirs(out_dir, exist_ok=True)
     
     property_dict = {}
-    if args.pdb_file:
-        pdb_files = [os.path.basename(args.pdb_file)]
-        pdb_dir = os.path.dirname(args.pdb_file) or '.'
-    else:
-        pdb_dir = args.pdb_dir
-        # Run the formatting script as a subprocess
-        script_path = os.path.join(os.path.dirname(__file__), 'format_pdb.sh')
-        if os.path.exists(script_path):
-            logging.info(f"Running PDB formatting script in: {pdb_dir}")
-            subprocess.run(['bash', script_path], cwd=pdb_dir, check=True)
-            # Update pdb_dir to point to the directory with formatted files
-            pdb_dir = os.path.join(pdb_dir, 'pdb_final')
-            logging.info(f"Using formatted PDBs from: {pdb_dir}")
-        else:
-            logging.warning(f"PDB formatting script not found at {script_path}. Using original PDBs.")
+    # Load canonical IDs from the test CSV
+    id_df = pd.read_csv(args.csv)
+    if 'id' not in id_df.columns:
+        raise ValueError('CSV must have an "id" column')
+    canonical_ids = list(id_df['id'])
 
-        pdb_files = [f for f in os.listdir(pdb_dir) if f.endswith('.pdb')]
-    logging.info(f"{len(pdb_files)} PDB files to process.")
+    pdb_dir = args.pdb_dir
+    pdb_files = [f for f in os.listdir(pdb_dir) if f.lower().endswith('.pdb')]
+    logging.info(f"{len(pdb_files)} PDB files found in {pdb_dir}.")
+
+    # Build a mapping from ID to PDB filename (best match by substring)
+    id_to_pdb = {}
+    for pid in canonical_ids:
+        matches = [f for f in pdb_files if pid in f]
+        if matches:
+            id_to_pdb[pid] = matches[0]  # Use first match
+        else:
+            id_to_pdb[pid] = None
     
     if args.sanitize:
         sanitized_path = sanitize_pdb_for_dssp(args.sanitize)
@@ -326,15 +326,20 @@ if __name__ == '__main__':
         properties.update(properties_dssp)
         return properties
 
-    with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
-        futures = [executor.submit(process_pdb, pdb, pdb_dir) for pdb in pdb_files]
-        for future in tqdm(as_completed(futures), total=len(pdb_files)):
-            properties = future.result()
+    # Build a mapping from PDB basename (without .pdb) to feature dict
+    feature_map = {}
+    for pid in canonical_ids:
+        pdb_file = id_to_pdb[pid]
+        if pdb_file:
+            properties = process_pdb(pdb_file, pdb_dir)
             if properties is not None:
-                for k, v in properties.items():
-                    if k not in property_dict:
-                        property_dict[k] = []
-                    property_dict[k].append(v)
+                feature_map[pid] = properties
+            else:
+                logging.warning(f"Feature extraction failed for {pid} ({pdb_file}), using zeros.")
+                feature_map[pid] = None
+        else:
+            logging.warning(f"No PDB file found for {pid}, using zeros.")
+            feature_map[pid] = None
     
     # --- Canonical feature column enforcement ---
     CANONICAL_FEATURE_COLUMNS = [
@@ -353,14 +358,19 @@ if __name__ == '__main__':
         'pLDDT', 'protein name'
     ]
 
-    # Build DataFrame enforcing canonical columns and order
-    df = pd.DataFrame(property_dict)
-    # Fill missing columns with 0
-    for col in CANONICAL_FEATURE_COLUMNS:
-        if col not in df.columns:
-            logging.warning(f"Feature column '{col}' missing in output, filling with 0.")
-            df[col] = 0
-    # Reorder columns
+    # Always output a row for every canonical ID, filling with zeros if missing
+    rows = []
+    for pid in canonical_ids:
+        row = {}
+        properties = feature_map.get(pid)
+        if properties is not None:
+            for col in CANONICAL_FEATURE_COLUMNS:
+                row[col] = properties.get(col, 0)
+        else:
+            for col in CANONICAL_FEATURE_COLUMNS:
+                row[col] = 0
+        row['protein name'] = pid
+        rows.append(row)
+    df = pd.DataFrame(rows)
     df = df[CANONICAL_FEATURE_COLUMNS]
-    # Write to CSV
     df.to_csv(args.out_file, index=False)

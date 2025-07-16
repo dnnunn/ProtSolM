@@ -53,11 +53,15 @@ python fasta_to_csv.py ../PeptideFrontEnd/random_proteins_combined.fasta data/PD
 ```
 - Output: `data/PDBSol/random_proteins_combined.csv` with columns `id,aa_seq,label`
 
-### **Step 2: Prepare Raw PDBs**
-Ensure your raw PDBs (matching the protein IDs in your FASTA/CSV) are in:
+### **Step 2: Place Raw PDBs**
+**IMPORTANT:** Before feature extraction, ensure all PDB filenames match exactly the IDs in your test CSV (no extra suffixes or extensions unless required). For example, if your test CSV uses `trypsin_cp_11`, your PDB should be named `trypsin_cp_11.pdb`.
+
+Place `{id}.pdb` files (matching the FASTA/CSV IDs) in:
 ```
 data/PDBSol/esmfold_pdb/
 ```
+
+After renaming, regenerate features to guarantee alignment between test and feature files. This prevents 'No features found' errors during evaluation.
 - Each file should be named `{id}.pdb` (where `{id}` matches the FASTA/CSV).
 
 ### **Step 3: Format PDBs for DSSP**
