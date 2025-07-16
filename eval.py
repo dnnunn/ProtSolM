@@ -256,12 +256,17 @@ if __name__ == "__main__":
         data.label = torch.tensor(label_dict[name]).view(1)
         data.aa_seq = seq_dict[name]
         data.name = name
-        if pdb_name in feature_dict:
+        # Try canonical ID first, then fallback to suffixed name for compatibility
+        if name in feature_dict:
+            feature_tensor = torch.from_numpy(feature_dict[name]).float().unsqueeze(0)
+            logger.info(f"Loaded features for canonical ID '{name}' with sum: {torch.sum(feature_tensor)}")
+            data.feature = feature_tensor
+        elif pdb_name in feature_dict:
             feature_tensor = torch.from_numpy(feature_dict[pdb_name]).float().unsqueeze(0)
-            logger.info(f"Loaded features for '{pdb_name}' with sum: {torch.sum(feature_tensor)}")
+            logger.info(f"Loaded features for suffixed name '{pdb_name}' with sum: {torch.sum(feature_tensor)}")
             data.feature = feature_tensor
         else:
-            logger.info(f"No features found for '{pdb_name}', using default zeros")
+            logger.info(f"No features found for '{name}' or '{pdb_name}', using default zeros")
             data.feature = torch.zeros(1, args.feature_dim)
         return data
     
